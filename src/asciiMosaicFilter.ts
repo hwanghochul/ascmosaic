@@ -20,6 +20,8 @@ export interface AsciiMosaicFilterOptions {
   mosaicCellTextureUrl?: string;
   /** 모자이크 셀 아틀라스의 셀 개수 (가로 방향, 1행 N열) */
   cellCount?: number;
+  /** 배경색 (기본값: 흰색 0xffffff) */
+  backgroundColor?: THREE.Color | number;
 }
 
 /**
@@ -35,6 +37,7 @@ export class AsciiMosaicFilter {
   private material!: THREE.ShaderMaterial; // 비동기 초기화
   private atlasResult!: MosaicAtlasResult; // 비동기 초기화
   private mosaicSize: number;
+  private backgroundColor: THREE.Color;
   private isEnabled: boolean = false;
 
   // 버텍스 쉐이더 (전체 화면 쿼드)
@@ -54,6 +57,7 @@ export class AsciiMosaicFilter {
     uniform float uMosaicSize;
     uniform float uCellCount;
     uniform vec2 uResolution;
+    uniform vec3 uBackgroundColor;
     
     varying vec2 vUv;
     
@@ -76,9 +80,9 @@ export class AsciiMosaicFilter {
       // 배경 임계값 (밝기가 이 값 이상이면 배경으로 간주)
       float backgroundThreshold = 0.9;
       
-      // 배경인 경우 흰색만 표시
+      // 배경인 경우 배경색만 표시
       if (brightness >= backgroundThreshold) {
-        gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0); // 흰색 배경
+        gl_FragColor = vec4(uBackgroundColor, 1.0);
         return;
       }
       
@@ -99,8 +103,9 @@ export class AsciiMosaicFilter {
       vec2 atlasUV = vec2(mix(uMin, uMax, localCoord.x), 1.0 - localCoord.y);
       vec4 atlasColor = texture2D(tAtlas, atlasUV);
       
-      // 아틀라스 색상을 그대로 사용 (원본 색상과 곱하지 않음)
-      gl_FragColor = vec4(atlasColor.rgb, 1.0);
+      // 배경색과 atlasColor를 normal 모드로 블렌딩 (알파 블렌딩)
+      vec3 finalColor = mix(uBackgroundColor, atlasColor.rgb, atlasColor.a);
+      gl_FragColor = vec4(finalColor, 1.0);
     }
   `;
 
@@ -112,12 +117,22 @@ export class AsciiMosaicFilter {
   ) {
     this.renderer = renderer;
     this.mosaicSize = options.mosaicSize ?? 8;
+    
+    // 배경색 설정
+    if (options.backgroundColor instanceof THREE.Color) {
+      this.backgroundColor = options.backgroundColor.clone();
+    } else if (typeof options.backgroundColor === 'number') {
+      this.backgroundColor = new THREE.Color(options.backgroundColor);
+    } else {
+      this.backgroundColor = new THREE.Color(0xffffff); // 기본값: 흰색
+    }
 
     // RenderTarget 생성 (FBO)
     this.renderTarget = new THREE.WebGLRenderTarget(width, height, {
       minFilter: THREE.LinearFilter,
       magFilter: THREE.LinearFilter,
       format: THREE.RGBAFormat,
+      type: THREE.UnsignedByteType,
     });
 
     // 포스트 프로세싱용 쿼드 생성
@@ -135,9 +150,11 @@ export class AsciiMosaicFilter {
           uMosaicSize: { value: this.mosaicSize },
           uCellCount: { value: this.atlasResult.cellCount },
           uResolution: { value: new THREE.Vector2(width, height) },
+          uBackgroundColor: { value: this.backgroundColor },
         },
         vertexShader: AsciiMosaicFilter.VERTEX_SHADER,
         fragmentShader: AsciiMosaicFilter.FRAGMENT_SHADER,
+        transparent: true, // 투명도 지원
       });
 
       this.quad = new THREE.Mesh(geometry, this.material);
@@ -227,6 +244,20 @@ export class AsciiMosaicFilter {
     this.mosaicSize = size;
     if (this.material) {
       this.material.uniforms.uMosaicSize.value = size;
+    }
+  }
+
+  /**
+   * 배경색 설정
+   */
+  setBackgroundColor(color: THREE.Color | number): void {
+    if (color instanceof THREE.Color) {
+      this.backgroundColor.copy(color);
+    } else {
+      this.backgroundColor.setHex(color);
+    }
+    if (this.material) {
+      this.material.uniforms.uBackgroundColor.value = this.backgroundColor;
     }
   }
 

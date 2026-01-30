@@ -38,7 +38,10 @@ export class AscMosaic {
     this.camera.position.z = 5;
 
     // Renderer 생성
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer = new THREE.WebGLRenderer({ 
+      antialias: true,
+      alpha: true, // 알파 채널 지원
+    });
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     container.appendChild(this.renderer.domElement);
 
@@ -336,13 +339,6 @@ export {
   AsciiMosaicFilter,
   type AsciiMosaicFilterOptions,
 } from './asciiMosaicFilter';
-
-// ASCII 아틀라스 내보내기
-export {
-  createAsciiAtlas,
-  type AsciiAtlasOptions,
-  type AsciiAtlasResult,
-} from './asciiAtlas';
 
 // 지구본 내보내기
 export { createEarth, type EarthOptions } from './earth';
