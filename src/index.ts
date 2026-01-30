@@ -267,6 +267,24 @@ export class AscMosaic {
   }
 
   /**
+   * 노이즈 강도를 설정합니다
+   */
+  setNoiseIntensity(intensity: number): void {
+    if (this.asciiMosaicFilter) {
+      this.asciiMosaicFilter.setNoiseIntensity(intensity);
+    }
+  }
+
+  /**
+   * 노이즈 업데이트 FPS를 설정합니다
+   */
+  setNoiseFPS(fps: number): void {
+    if (this.asciiMosaicFilter) {
+      this.asciiMosaicFilter.setNoiseFPS(fps);
+    }
+  }
+
+  /**
    * Scene 가져오기
    */
   getScene(): THREE.Scene {

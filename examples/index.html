@@ -58,6 +58,67 @@
       margin-bottom: 20px;
     }
 
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      margin-bottom: 10px;
+    }
+
+    .slider-container label {
+      font-weight: 500;
+      color: #333;
+      min-width: 120px;
+    }
+
+    .slider-container input[type="range"] {
+      flex: 1;
+      height: 6px;
+      border-radius: 3px;
+      background: #e0e0e0;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    .slider-container input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #667eea;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    .slider-container input[type="range"]::-webkit-slider-thumb:hover {
+      background: #5568d3;
+    }
+
+    .slider-container input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #667eea;
+      cursor: pointer;
+      border: none;
+      transition: background 0.3s ease;
+    }
+
+    .slider-container input[type="range"]::-moz-range-thumb:hover {
+      background: #5568d3;
+    }
+
+    .slider-value {
+      min-width: 40px;
+      text-align: right;
+      font-weight: 600;
+      color: #667eea;
+    }
+
     button {
       padding: 12px 24px;
       font-size: 16px;
@@ -117,6 +178,24 @@
       <button id="add-sphere-btn">구 추가</button>
       <button id="clear-btn">초기화</button>
       <button id="ascii-toggle-btn">ASCII 필터 토글</button>
+    </div>
+
+    <div class="slider-container" id="pixel-size-container" style="display: none;">
+      <label for="pixel-size-slider">픽셀 사이즈:</label>
+      <input type="range" id="pixel-size-slider" min="4" max="32" value="10" step="1">
+      <span class="slider-value" id="pixel-size-value">10</span>
+    </div>
+
+    <div class="slider-container" id="noise-intensity-container" style="display: none;">
+      <label for="noise-intensity-slider">노이즈 강도:</label>
+      <input type="range" id="noise-intensity-slider" min="0" max="100" value="20" step="1">
+      <span class="slider-value" id="noise-intensity-value">0.20</span>
+    </div>
+
+    <div class="slider-container" id="noise-fps-container" style="display: none;">
+      <label for="noise-fps-slider">노이즈 FPS:</label>
+      <input type="range" id="noise-fps-slider" min="1" max="60" value="10" step="1">
+      <span class="slider-value" id="noise-fps-value">10</span>
     </div>
 
     <div class="info">
