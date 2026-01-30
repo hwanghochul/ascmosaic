@@ -1,18 +1,21 @@
 import * as THREE from 'three';
-import { AsciiAtlasResult, createAsciiAtlas } from './asciiAtlas';
 
 /**
- * ASCII 모자이크 필터 옵션
+ * 모자이크 셀 아틀라스 결과
+ */
+interface MosaicAtlasResult {
+  /** 텍스처 */
+  texture: THREE.Texture;
+  /** 셀 개수 */
+  cellCount: number;
+}
+
+/**
+ * 모자이크 필터 옵션
  */
 export interface AsciiMosaicFilterOptions {
   /** 모자이크 블록 크기 (픽셀 단위) */
   mosaicSize?: number;
-  /** ASCII 문자 세트 */
-  charset?: string;
-  /** ASCII 아틀라스 텍스처 (지정하지 않으면 자동 생성) */
-  atlasTexture?: THREE.Texture;
-  /** ASCII 아틀라스 결과 (atlasTexture와 함께 사용) */
-  atlasResult?: AsciiAtlasResult;
   /** 모자이크 셀 텍스처 URL (mosaic_cell.png 이미지 아틀라스 사용) */
   mosaicCellTextureUrl?: string;
   /** 모자이크 셀 아틀라스의 셀 개수 (가로 방향, 1행 N열) */
@@ -20,8 +23,8 @@ export interface AsciiMosaicFilterOptions {
 }
 
 /**
- * ASCII 모자이크 필터 클래스
- * FBO와 쉐이더를 사용하여 ASCII 모자이크 포스트 프로세싱 효과를 적용합니다.
+ * 모자이크 필터 클래스
+ * FBO와 쉐이더를 사용하여 모자이크 셀 아틀라스를 이용한 포스트 프로세싱 효과를 적용합니다.
  */
 export class AsciiMosaicFilter {
   private renderer: THREE.WebGLRenderer;
@@ -30,7 +33,7 @@ export class AsciiMosaicFilter {
   private camera: THREE.OrthographicCamera;
   private quad!: THREE.Mesh; // 비동기 초기화
   private material!: THREE.ShaderMaterial; // 비동기 초기화
-  private atlasResult!: AsciiAtlasResult; // 비동기 초기화
+  private atlasResult!: MosaicAtlasResult; // 비동기 초기화
   private mosaicSize: number;
   private isEnabled: boolean = false;
 
@@ -130,7 +133,7 @@ export class AsciiMosaicFilter {
           tDiffuse: { value: this.renderTarget.texture },
           tAtlas: { value: this.atlasResult.texture },
           uMosaicSize: { value: this.mosaicSize },
-          uCellCount: { value: this.atlasResult.charCount },
+          uCellCount: { value: this.atlasResult.cellCount },
           uResolution: { value: new THREE.Vector2(width, height) },
         },
         vertexShader: AsciiMosaicFilter.VERTEX_SHADER,
@@ -143,61 +146,37 @@ export class AsciiMosaicFilter {
   }
 
   /**
-   * ASCII 아틀라스 초기화
+   * 모자이크 셀 아틀라스 초기화
    */
   private async initAtlas(
     options: AsciiMosaicFilterOptions
   ): Promise<void> {
-    if (options.atlasResult) {
-      this.atlasResult = options.atlasResult;
-    } else if (options.mosaicCellTextureUrl) {
-      // 모자이크 셀 이미지 아틀라스 사용
-      const cellCount = options.cellCount ?? 10; // 기본값
-      const textureLoader = new THREE.TextureLoader();
-      
-      const texture = textureLoader.load(
-        options.mosaicCellTextureUrl,
-        () => {
-          texture.needsUpdate = true;
-        },
-        undefined,
-        (error) => {
-          console.warn('모자이크 셀 텍스처 로딩 실패:', error);
-        }
-      );
+    const textureUrl = options.mosaicCellTextureUrl ?? '/textures/mosaic_cell.png';
+    const cellCount = options.cellCount ?? 10; // 기본값
+    
+    const textureLoader = new THREE.TextureLoader();
+    
+    const texture = textureLoader.load(
+      textureUrl,
+      () => {
+        texture.needsUpdate = true;
+      },
+      undefined,
+      (error) => {
+        console.warn('모자이크 셀 텍스처 로딩 실패:', error);
+      }
+    );
 
-      // 텍스처 설정
-      texture.minFilter = THREE.NearestFilter;
-      texture.magFilter = THREE.NearestFilter;
-      texture.wrapS = THREE.ClampToEdgeWrapping;
-      texture.wrapT = THREE.ClampToEdgeWrapping;
+    // 텍스처 설정
+    texture.minFilter = THREE.NearestFilter;
+    texture.magFilter = THREE.NearestFilter;
+    texture.wrapS = THREE.ClampToEdgeWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
 
-      this.atlasResult = {
-        texture,
-        charCount: cellCount,
-        charUVs: Array.from({ length: cellCount }, (_, i) => [
-          i / cellCount,
-          (i + 1) / cellCount,
-        ]),
-      };
-    } else if (options.atlasTexture) {
-      // 텍스처만 제공된 경우, charCount를 추정해야 함
-      // 기본값 사용
-      const charset = options.charset ?? ' .,:;+=xX$&@#';
-      this.atlasResult = {
-        texture: options.atlasTexture,
-        charCount: charset.length,
-        charUVs: charset.split('').map((_, i) => [
-          i / charset.length,
-          (i + 1) / charset.length,
-        ]),
-      };
-    } else {
-      // 아틀라스 자동 생성
-      this.atlasResult = await createAsciiAtlas({
-        charset: options.charset,
-      });
-    }
+    this.atlasResult = {
+      texture,
+      cellCount,
+    };
   }
 
   /**

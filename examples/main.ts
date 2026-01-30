@@ -74,8 +74,8 @@ asciiToggleBtn.addEventListener('click', async () => {
   try {
     await mosaic.toggleAsciiMosaicFilter({
       mosaicSize: 16, // 모자이크 블록 크기
-      mosaicCellTextureUrl: '/textures/mosaic_cell.png', // 모자이크 셀 아틀라스
-      cellCount: 10, // 아틀라스의 셀 개수 (가로 방향)
+      mosaicCellTextureUrl: '/textures/mosaic_cell2.png', // 모자이크 셀 아틀라스
+      cellCount: 6, // 아틀라스의 셀 개수 (가로 방향)
     });
 
     // 버튼 텍스트 업데이트
