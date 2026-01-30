@@ -13,6 +13,10 @@ export interface AsciiMosaicFilterOptions {
   atlasTexture?: THREE.Texture;
   /** ASCII 아틀라스 결과 (atlasTexture와 함께 사용) */
   atlasResult?: AsciiAtlasResult;
+  /** 모자이크 셀 텍스처 URL (mosaic_cell.png 이미지 아틀라스 사용) */
+  mosaicCellTextureUrl?: string;
+  /** 모자이크 셀 아틀라스의 셀 개수 (가로 방향, 1행 N열) */
+  cellCount?: number;
 }
 
 /**
@@ -45,7 +49,7 @@ export class AsciiMosaicFilter {
     uniform sampler2D tDiffuse;
     uniform sampler2D tAtlas;
     uniform float uMosaicSize;
-    uniform float uCharCount;
+    uniform float uCellCount;
     uniform vec2 uResolution;
     
     varying vec2 vUv;
@@ -75,24 +79,24 @@ export class AsciiMosaicFilter {
         return;
       }
       
-      // 밝기를 ASCII 인덱스로 매핑 (0 ~ charCount-1)
-      // 밝기를 반전시켜서: 어두울수록(검은색) 더 진한 문자, 밝을수록(흰색) 공백
+      // 밝기를 셀 인덱스로 매핑 (0 ~ cellCount-1)
+      // 밝기를 반전시켜서: 밝을수록(흰색) 첫 번째 셀, 어두울수록(검은색) 마지막 셀
       float invertedBrightness = 1.0 - brightness;
-      float charIndex = floor(invertedBrightness * uCharCount);
-      charIndex = clamp(charIndex, 0.0, uCharCount - 1.0);
+      float cellIndex = floor(invertedBrightness * uCellCount);
+      cellIndex = clamp(cellIndex, 0.0, uCellCount - 1.0);
       
-      // ASCII 아틀라스에서 해당 문자의 UV 좌표 계산
-      float uMin = charIndex / uCharCount;
-      float uMax = (charIndex + 1.0) / uCharCount;
+      // 모자이크 셀 아틀라스에서 해당 셀의 UV 좌표 계산 (가로 방향)
+      float uMin = cellIndex / uCellCount;
+      float uMax = (cellIndex + 1.0) / uCellCount;
       
       // 모자이크 블록 내에서의 로컬 좌표 (0 ~ 1)
       vec2 localCoord = fract(vUv * uResolution / uMosaicSize);
       
-      // ASCII 아틀라스에서 샘플링 (흰색 배경 + 검정색 글자)
+      // 모자이크 셀 아틀라스에서 샘플링
       vec2 atlasUV = vec2(mix(uMin, uMax, localCoord.x), 1.0 - localCoord.y);
       vec4 atlasColor = texture2D(tAtlas, atlasUV);
       
-      // 원본 색상 무시하고 아틀라스 색상만 사용 (흰색 배경 + 검정색 글자)
+      // 아틀라스 색상을 그대로 사용 (원본 색상과 곱하지 않음)
       gl_FragColor = vec4(atlasColor.rgb, 1.0);
     }
   `;
@@ -126,7 +130,7 @@ export class AsciiMosaicFilter {
           tDiffuse: { value: this.renderTarget.texture },
           tAtlas: { value: this.atlasResult.texture },
           uMosaicSize: { value: this.mosaicSize },
-          uCharCount: { value: this.atlasResult.charCount },
+          uCellCount: { value: this.atlasResult.charCount },
           uResolution: { value: new THREE.Vector2(width, height) },
         },
         vertexShader: AsciiMosaicFilter.VERTEX_SHADER,
@@ -146,6 +150,36 @@ export class AsciiMosaicFilter {
   ): Promise<void> {
     if (options.atlasResult) {
       this.atlasResult = options.atlasResult;
+    } else if (options.mosaicCellTextureUrl) {
+      // 모자이크 셀 이미지 아틀라스 사용
+      const cellCount = options.cellCount ?? 10; // 기본값
+      const textureLoader = new THREE.TextureLoader();
+      
+      const texture = textureLoader.load(
+        options.mosaicCellTextureUrl,
+        () => {
+          texture.needsUpdate = true;
+        },
+        undefined,
+        (error) => {
+          console.warn('모자이크 셀 텍스처 로딩 실패:', error);
+        }
+      );
+
+      // 텍스처 설정
+      texture.minFilter = THREE.NearestFilter;
+      texture.magFilter = THREE.NearestFilter;
+      texture.wrapS = THREE.ClampToEdgeWrapping;
+      texture.wrapT = THREE.ClampToEdgeWrapping;
+
+      this.atlasResult = {
+        texture,
+        charCount: cellCount,
+        charUVs: Array.from({ length: cellCount }, (_, i) => [
+          i / cellCount,
+          (i + 1) / cellCount,
+        ]),
+      };
     } else if (options.atlasTexture) {
       // 텍스처만 제공된 경우, charCount를 추정해야 함
       // 기본값 사용
