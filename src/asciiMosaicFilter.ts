@@ -76,8 +76,9 @@ export class AsciiMosaicFilter {
       }
       
       // 밝기를 ASCII 인덱스로 매핑 (0 ~ charCount-1)
-      // 배경이 아닌 경우에만 문자 표시
-      float charIndex = floor(brightness * uCharCount);
+      // 밝기를 반전시켜서: 어두울수록(검은색) 더 진한 문자, 밝을수록(흰색) 공백
+      float invertedBrightness = 1.0 - brightness;
+      float charIndex = floor(invertedBrightness * uCharCount);
       charIndex = clamp(charIndex, 0.0, uCharCount - 1.0);
       
       // ASCII 아틀라스에서 해당 문자의 UV 좌표 계산

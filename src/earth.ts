@@ -67,6 +67,7 @@ export function createEarth(options: EarthOptions = {}): THREE.Mesh {
   const materialOptions: THREE.MeshStandardMaterialParameters = {
     roughness: 0.8,
     metalness: 0.2,
+    color: 0xDDDDDD,
   };
 
   // 텍스처가 성공적으로 로드된 경우에만 추가
@@ -78,7 +79,7 @@ export function createEarth(options: EarthOptions = {}): THREE.Mesh {
     console.warn('텍스처를 사용할 수 없어 기본 색상으로 표시합니다.');
   }
 
-  const material = new THREE.MeshStandardMaterial(materialOptions);
+  const material = new THREE.MeshBasicMaterial(materialOptions);
 
   // 메시 생성
   const earth = new THREE.Mesh(geometry, material);

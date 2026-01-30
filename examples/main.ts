@@ -73,7 +73,7 @@ function animate() {
 asciiToggleBtn.addEventListener('click', async () => {
   try {
     await mosaic.toggleAsciiMosaicFilter({
-      mosaicSize: 16, // 모자이크 블록 크기
+      mosaicSize: 10, // 모자이크 블록 크기
       charset: ' .,:;+=xX$&@#', // ASCII 문자 세트
     });
 
