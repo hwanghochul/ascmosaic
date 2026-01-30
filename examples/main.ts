@@ -90,9 +90,27 @@ asciiToggleBtn.addEventListener('click', async () => {
   }
 });
 
+// 조명 추가 (지구본을 위해 필요)
+mosaic.addLights();
+
+// 지구본 추가
+mosaic.addEarth({
+  radius: 2,
+  widthSegments: 64,
+  heightSegments: 32,
+});
+
+// OrbitControls 설정 (마우스로 지구본 회전 및 줌)
+mosaic.setupOrbitControls({
+  minDistance: 3,
+  maxDistance: 10,
+  rotateSpeed: 1.0,
+  zoomSpeed: 0.1,
+});
+
 // 애니메이션 시작
 animate();
 
-// 초기 큐브 추가
-mosaic.addCube();
-mosaic.animate();
+// 초기 큐브 추가 (선택사항)
+// mosaic.addCube();
+// mosaic.animate();

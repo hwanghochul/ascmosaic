@@ -3,6 +3,8 @@ import {
   AsciiMosaicFilter,
   AsciiMosaicFilterOptions,
 } from './asciiMosaicFilter';
+import { createEarth, EarthOptions } from './earth';
+import { OrbitControls, OrbitControlsOptions } from './orbitControls';
 
 /**
  * AscMosaic 라이브러리 메인 클래스
@@ -12,11 +14,16 @@ export class AscMosaic {
   private camera: THREE.PerspectiveCamera;
   private renderer: THREE.WebGLRenderer;
   private cube: THREE.Mesh | null = null;
+  private earth: THREE.Mesh | null = null;
+  private orbitControls: OrbitControls | null = null;
   private asciiMosaicFilter: AsciiMosaicFilter | null = null;
   private animationFrameId: number | null = null;
   private isAnimating: boolean = false;
+  private container: HTMLElement;
 
   constructor(container: HTMLElement) {
+    this.container = container;
+
     // Scene 생성
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0xffffff); // 흰색 배경
@@ -59,6 +66,65 @@ export class AscMosaic {
   }
 
   /**
+   * 지구본을 추가합니다
+   */
+  addEarth(options?: EarthOptions): THREE.Mesh {
+    // 기존 지구본 제거
+    if (this.earth) {
+      this.scene.remove(this.earth);
+      if (this.earth.geometry) {
+        this.earth.geometry.dispose();
+      }
+      if (this.earth.material instanceof THREE.Material) {
+        this.earth.material.dispose();
+      }
+    }
+
+    // 지구본 생성
+    this.earth = createEarth(options);
+    this.scene.add(this.earth);
+
+    // 카메라 위치 조정 (지구본 중심으로)
+    this.camera.position.set(0, 0, 5);
+    this.camera.lookAt(0, 0, 0);
+
+    return this.earth;
+  }
+
+  /**
+   * OrbitControls를 설정합니다
+   */
+  setupOrbitControls(options?: OrbitControlsOptions): OrbitControls {
+    // 기존 컨트롤 제거
+    if (this.orbitControls) {
+      this.orbitControls.dispose();
+    }
+
+    // 새 컨트롤 생성
+    this.orbitControls = new OrbitControls(
+      this.camera,
+      this.renderer.domElement,
+      options
+    );
+
+    return this.orbitControls;
+  }
+
+  /**
+   * 조명을 추가합니다
+   */
+  addLights(): void {
+    // Ambient Light (전체 조명)
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    this.scene.add(ambientLight);
+
+    // Directional Light (태양광)
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(5, 5, 5);
+    this.scene.add(directionalLight);
+  }
+
+  /**
    * 렌더링 수행
    */
   private render(): void {
@@ -87,6 +153,16 @@ export class AscMosaic {
       if (this.cube) {
         this.cube.rotation.x += 0.01;
         this.cube.rotation.y += 0.01;
+      }
+
+      // 지구본 자동 회전
+      if (this.earth) {
+        this.earth.rotation.y += 0.005; // Y축 기준 회전 (지구 자전)
+      }
+
+      // OrbitControls 업데이트
+      if (this.orbitControls) {
+        this.orbitControls.update();
       }
 
       this.render();
@@ -221,6 +297,18 @@ export class AscMosaic {
       }
     }
 
+    if (this.earth) {
+      this.earth.geometry.dispose();
+      if (this.earth.material instanceof THREE.Material) {
+        this.earth.material.dispose();
+      }
+    }
+
+    if (this.orbitControls) {
+      this.orbitControls.dispose();
+      this.orbitControls = null;
+    }
+
     if (this.asciiMosaicFilter) {
       this.asciiMosaicFilter.dispose();
       this.asciiMosaicFilter = null;
@@ -255,6 +343,12 @@ export {
   type AsciiAtlasOptions,
   type AsciiAtlasResult,
 } from './asciiAtlas';
+
+// 지구본 내보내기
+export { createEarth, type EarthOptions } from './earth';
+
+// OrbitControls 내보내기
+export { OrbitControls, type OrbitControlsOptions } from './orbitControls';
 
 // Three.js를 재내보내기
 export * from 'three';
