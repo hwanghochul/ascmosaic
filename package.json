@@ -1,0 +1,46 @@
+{
+  "name": "ascmosaic",
+  "version": "1.0.0",
+  "description": "Three.js library built with TypeScript",
+  "type": "module",
+  "main": "./dist/ascmosaic.umd.cjs",
+  "module": "./dist/ascmosaic.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/ascmosaic.js",
+      "require": "./dist/ascmosaic.umd.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "example:dev": "vite --config vite.example.config.ts",
+    "example:build": "vite build --config vite.example.config.ts",
+    "example:preview": "vite preview --config vite.example.config.ts"
+  },
+  "keywords": [
+    "threejs",
+    "three.js",
+    "typescript",
+    "3d",
+    "webgl"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/three": "^0.160.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.8",
+    "vite-plugin-dts": "^3.7.0"
+  },
+  "dependencies": {
+    "three": "^0.160.0"
+  }
+}
