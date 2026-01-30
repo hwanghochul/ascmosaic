@@ -61,12 +61,12 @@ export function createAsciiAtlas(
         return;
       }
 
-      // 배경을 검은색으로 설정
-      ctx.fillStyle = '#000000';
+      // 배경을 흰색으로 설정
+      ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(0, 0, atlasWidth, atlasHeight);
 
-      // 텍스트 스타일 설정
-      ctx.fillStyle = '#FFFFFF';
+      // 텍스트 스타일 설정 (검정색 글자)
+      ctx.fillStyle = '#000000';
       ctx.font = `${fontSize}px ${fontFamily}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';

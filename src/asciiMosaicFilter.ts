@@ -63,10 +63,20 @@ export class AsciiMosaicFilter {
       // 원본 텍스처에서 샘플링 (블록의 첫 번째 픽셀 사용)
       vec4 color = texture2D(tDiffuse, sampleCoord);
       
-      // 그레이스케일 밝기 계산
+      // 그레이스케일 밝기 계산 (원본 색상은 무시하고 밝기만 사용)
       float brightness = rgbToBrightness(color.rgb);
       
+      // 배경 임계값 (밝기가 이 값 이상이면 배경으로 간주)
+      float backgroundThreshold = 0.9;
+      
+      // 배경인 경우 흰색만 표시
+      if (brightness >= backgroundThreshold) {
+        gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0); // 흰색 배경
+        return;
+      }
+      
       // 밝기를 ASCII 인덱스로 매핑 (0 ~ charCount-1)
+      // 배경이 아닌 경우에만 문자 표시
       float charIndex = floor(brightness * uCharCount);
       charIndex = clamp(charIndex, 0.0, uCharCount - 1.0);
       
@@ -77,12 +87,12 @@ export class AsciiMosaicFilter {
       // 모자이크 블록 내에서의 로컬 좌표 (0 ~ 1)
       vec2 localCoord = fract(vUv * uResolution / uMosaicSize);
       
-      // ASCII 아틀라스에서 샘플링
+      // ASCII 아틀라스에서 샘플링 (흰색 배경 + 검정색 글자)
       vec2 atlasUV = vec2(mix(uMin, uMax, localCoord.x), 1.0 - localCoord.y);
       vec4 atlasColor = texture2D(tAtlas, atlasUV);
       
-      // 원본 색상과 ASCII 문자 색상을 결합 (또는 ASCII 문자 색상만 사용)
-      gl_FragColor = vec4(atlasColor.rgb * color.rgb, color.a);
+      // 원본 색상 무시하고 아틀라스 색상만 사용 (흰색 배경 + 검정색 글자)
+      gl_FragColor = vec4(atlasColor.rgb, 1.0);
     }
   `;
 

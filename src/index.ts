@@ -19,7 +19,7 @@ export class AscMosaic {
   constructor(container: HTMLElement) {
     // Scene 생성
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x222222);
+    this.scene.background = new THREE.Color(0xffffff); // 흰색 배경
 
     // Camera 생성
     this.camera = new THREE.PerspectiveCamera(
