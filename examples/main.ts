@@ -6,14 +6,15 @@ const canvasContainer = document.getElementById('canvas-container')!;
 const addCubeBtn = document.getElementById('add-cube-btn')!;
 const addSphereBtn = document.getElementById('add-sphere-btn')!;
 const clearBtn = document.getElementById('clear-btn')!;
+const asciiToggleBtn = document.getElementById('ascii-toggle-btn')!;
 
 // AscMosaic 인스턴스 생성
 const mosaic = new AscMosaic(canvasContainer);
 
-// Scene에 직접 접근하기 위해 (예제용)
-const scene = (mosaic as any).scene as THREE.Scene;
-const camera = (mosaic as any).camera as THREE.PerspectiveCamera;
-const renderer = (mosaic as any).renderer as THREE.WebGLRenderer;
+// Scene, Camera, Renderer 가져오기
+const scene = mosaic.getScene();
+const camera = mosaic.getCamera();
+const renderer = mosaic.getRenderer();
 
 // 저장된 메시들
 const meshes: THREE.Mesh[] = [];
@@ -64,8 +65,30 @@ function animate() {
     mesh.rotation.y += 0.01;
   });
 
-  renderer.render(scene, camera);
+  // AscMosaic의 렌더링 메서드 사용 (필터 지원)
+  mosaic.renderOnce();
 }
+
+// ASCII 필터 토글 버튼
+asciiToggleBtn.addEventListener('click', async () => {
+  try {
+    await mosaic.toggleAsciiMosaicFilter({
+      mosaicSize: 16, // 모자이크 블록 크기
+      charset: ' .,:;+=xX$&@#', // ASCII 문자 세트
+    });
+
+    // 버튼 텍스트 업데이트
+    if (mosaic.isAsciiMosaicFilterEnabled()) {
+      asciiToggleBtn.textContent = 'ASCII 필터 끄기';
+      asciiToggleBtn.style.background = '#28a745';
+    } else {
+      asciiToggleBtn.textContent = 'ASCII 필터 토글';
+      asciiToggleBtn.style.background = '#667eea';
+    }
+  } catch (error) {
+    console.error('ASCII 필터 토글 오류:', error);
+  }
+});
 
 // 애니메이션 시작
 animate();
