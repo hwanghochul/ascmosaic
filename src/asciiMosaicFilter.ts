@@ -22,6 +22,10 @@ export interface AsciiMosaicFilterOptions {
   cellCount?: number;
   /** 배경색 (기본값: 흰색 0xffffff) */
   backgroundColor?: THREE.Color | number;
+  /** 노이즈 강도 (0.0 ~ 1.0, 기본값: 0.0) */
+  noiseIntensity?: number;
+  /** 노이즈 업데이트 FPS (기본값: 15) */
+  noiseFPS?: number;
 }
 
 /**
@@ -38,6 +42,10 @@ export class AsciiMosaicFilter {
   private atlasResult!: MosaicAtlasResult; // 비동기 초기화
   private mosaicSize: number;
   private backgroundColor: THREE.Color;
+  private noiseIntensity: number;
+  private noiseFPS: number;
+  private time: number = 0.0;
+  private lastNoiseUpdateTime: number = 0.0;
   private isEnabled: boolean = false;
 
   // 버텍스 쉐이더 (전체 화면 쿼드)
@@ -58,12 +66,27 @@ export class AsciiMosaicFilter {
     uniform float uCellCount;
     uniform vec2 uResolution;
     uniform vec3 uBackgroundColor;
+    uniform float uNoiseIntensity;
+    uniform float uTime;
     
     varying vec2 vUv;
     
     // RGB를 그레이스케일 밝기로 변환
     float rgbToBrightness(vec3 color) {
       return dot(color, vec3(0.299, 0.587, 0.114));
+    }
+    
+    // 해시 함수: 2D 좌표를 기반으로 랜덤 값 생성
+    float hash(vec2 p) {
+      return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+    }
+    
+    // 노이즈 함수: 모자이크 블록 좌표와 시간을 기반으로 노이즈 값 생성 (-1.0 ~ 1.0)
+    float noise(vec2 coord, float time) {
+      // 시간을 좌표에 추가하여 시간에 따라 변화하도록 함
+      vec2 timeCoord = coord + vec2(time * 0.1, time * 0.15);
+      float h = hash(timeCoord);
+      return h * 2.0 - 1.0; // -1.0 ~ 1.0 범위로 변환
     }
     
     void main() {
@@ -80,15 +103,20 @@ export class AsciiMosaicFilter {
       // 배경 임계값 (밝기가 이 값 이상이면 배경으로 간주)
       float backgroundThreshold = 0.9;
       
-      // 배경인 경우 배경색만 표시
+      // 배경인 경우 배경색만 표시 (원본 밝기 사용)
       if (brightness >= backgroundThreshold) {
         gl_FragColor = vec4(uBackgroundColor, 1.0);
         return;
       }
       
-      // 밝기를 셀 인덱스로 매핑 (0 ~ cellCount-1)
+      // 노이즈 적용: 모자이크 블록 좌표와 시간을 기반으로 노이즈 생성
+      float noiseValue = noise(mosaicCoord, uTime) * uNoiseIntensity;
+      float noisyBrightness = brightness + noiseValue;
+      noisyBrightness = clamp(noisyBrightness, 0.0, 1.0); // 0.0 ~ 1.0 범위로 클램프
+      
+      // 노이즈가 적용된 밝기를 셀 인덱스로 매핑 (0 ~ cellCount-1)
       // 밝기를 반전시켜서: 밝을수록(흰색) 첫 번째 셀, 어두울수록(검은색) 마지막 셀
-      float invertedBrightness = 1.0 - brightness;
+      float invertedBrightness = 1.0 - noisyBrightness;
       float cellIndex = floor(invertedBrightness * uCellCount);
       cellIndex = clamp(cellIndex, 0.0, uCellCount - 1.0);
       
@@ -117,6 +145,9 @@ export class AsciiMosaicFilter {
   ) {
     this.renderer = renderer;
     this.mosaicSize = options.mosaicSize ?? 8;
+    this.noiseIntensity = options.noiseIntensity ?? 0.0; // 기본값: 노이즈 없음
+    this.noiseFPS = options.noiseFPS ?? 15; // 기본값: 15 FPS
+    this.lastNoiseUpdateTime = performance.now();
     
     // 배경색 설정
     if (options.backgroundColor instanceof THREE.Color) {
@@ -151,6 +182,8 @@ export class AsciiMosaicFilter {
           uCellCount: { value: this.atlasResult.cellCount },
           uResolution: { value: new THREE.Vector2(width, height) },
           uBackgroundColor: { value: this.backgroundColor },
+          uNoiseIntensity: { value: this.noiseIntensity },
+          uTime: { value: this.time },
         },
         vertexShader: AsciiMosaicFilter.VERTEX_SHADER,
         fragmentShader: AsciiMosaicFilter.FRAGMENT_SHADER,
@@ -212,6 +245,22 @@ export class AsciiMosaicFilter {
   render(): void {
     if (!this.material || !this.quad || !this.atlasResult) return;
 
+    // 노이즈 FPS에 맞춰 시간 업데이트 제한
+    const currentTime = performance.now();
+    const timeDelta = currentTime - this.lastNoiseUpdateTime;
+    const minInterval = 1000.0 / this.noiseFPS; // 밀리초 단위
+
+    if (timeDelta >= minInterval) {
+      // 시간 업데이트 (밀리초를 초로 변환)
+      this.time = currentTime * 0.001;
+      this.lastNoiseUpdateTime = currentTime;
+      
+      // 쉐이더 유니폼 업데이트
+      if (this.material) {
+        this.material.uniforms.uTime.value = this.time;
+      }
+    }
+
     // 쉐이더 유니폼 업데이트
     this.material.uniforms.tDiffuse.value = this.renderTarget.texture;
     this.material.uniforms.uMosaicSize.value = this.mosaicSize;
@@ -259,6 +308,24 @@ export class AsciiMosaicFilter {
     if (this.material) {
       this.material.uniforms.uBackgroundColor.value = this.backgroundColor;
     }
+  }
+
+  /**
+   * 노이즈 강도 설정
+   */
+  setNoiseIntensity(intensity: number): void {
+    this.noiseIntensity = Math.max(0.0, Math.min(1.0, intensity));
+    if (this.material) {
+      this.material.uniforms.uNoiseIntensity.value = this.noiseIntensity;
+    }
+  }
+
+  /**
+   * 노이즈 업데이트 FPS 설정
+   */
+  setNoiseFPS(fps: number): void {
+    this.noiseFPS = Math.max(1.0, fps); // 최소 1 FPS
+    this.lastNoiseUpdateTime = performance.now(); // 리셋하여 즉시 업데이트
   }
 
   /**

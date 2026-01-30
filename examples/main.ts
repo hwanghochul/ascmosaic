@@ -77,6 +77,8 @@ asciiToggleBtn.addEventListener('click', async () => {
       mosaicCellTextureUrl: '/textures/mosaic_cell2.png', // 모자이크 셀 아틀라스
       cellCount: 6, // 아틀라스의 셀 개수 (가로 방향)
       backgroundColor: 0xffffff, // 흰색 배경
+      noiseIntensity: 0.2, // 노이즈 강도 (0.0 ~ 1.0)
+      noiseFPS: 10, // 노이즈 업데이트 FPS
     });
 
     // 버튼 텍스트 업데이트
