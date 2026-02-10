@@ -18,6 +18,9 @@ const noiseFPSSlider = document.getElementById('noise-fps-slider')! as HTMLInput
 const noiseFPSValue = document.getElementById('noise-fps-value')!;
 const textureSelectorContainer = document.getElementById('texture-selector-container')!;
 const textureSelectors = document.querySelectorAll('input[name="texture-select"]') as NodeListOf<HTMLInputElement>;
+const generateHtmlBtn = document.getElementById('generate-html-btn')!;
+const previewHtmlBtn = document.getElementById('preview-html-btn')!;
+const generatedHtmlCode = document.getElementById('generated-html-code')! as HTMLTextAreaElement;
 
 // AscMosaic 인스턴스 생성
 const mosaic = new AscMosaic(canvasContainer);
@@ -193,6 +196,73 @@ mosaic.setupOrbitControls({
   maxDistance: 10,
   rotateSpeed: 1.0,
   zoomSpeed: 0.1,
+});
+
+// HTML 스니펫 생성 (설정만 인라인, 로직은 외부 스크립트)
+function generateHTMLCode(): string {
+  const config = {
+    mosaicSize: currentMosaicSize,
+    mosaicCellTextureUrl: currentTextureUrl,
+    cellCount: 6,
+    backgroundColor: 0xffffff,
+    noiseIntensity: currentNoiseIntensity,
+    noiseFPS: currentNoiseFPS,
+  };
+  return `<div id="canvas-container" class="canvas-container" style="width:100%;height:500px;"></div>
+<script>
+window.ASC_MOSAIC_CONFIG = ${JSON.stringify(config, null, 2)};
+</script>
+<script type="module" src="./ascmosaic-app.js"></script>`;
+}
+
+// 새 창 미리보기용: 스니펫을 최소 뼈대 HTML로 감싸고, 스크립트/텍스처는 현재 오리진으로 로드
+function buildPreviewHTML(snippet: string): string {
+  const origin = location.origin;
+  const scriptUrl = new URL('/ascmosaic-app.js', origin).href;
+  const baseUrlScript = `<script>window.ASC_MOSAIC_BASE_URL = ${JSON.stringify(origin)};</script>\n`;
+  const bodyContent = snippet.replace(
+    '<script type="module" src="./ascmosaic-app.js"></script>',
+    `<script type="module" src="${scriptUrl}"></script>`
+  );
+  return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AscMosaic 미리보기</title>
+  <style>
+    body { margin: 0; padding: 20px; background: #f5f5f5; }
+    .canvas-container { cursor: grab; }
+    .canvas-container:active { cursor: grabbing; }
+  </style>
+</head>
+<body>
+${baseUrlScript}${bodyContent}
+</body>
+</html>`;
+}
+
+// HTML 코드 생성 버튼 이벤트
+generateHtmlBtn.addEventListener('click', () => {
+  const htmlCode = generateHTMLCode();
+  generatedHtmlCode.value = htmlCode;
+  generatedHtmlCode.style.display = 'block';
+  previewHtmlBtn.style.display = 'inline-block';
+  
+  // 텍스트 선택 (복사하기 쉽게)
+  generatedHtmlCode.select();
+});
+
+// 새 창에서 확인 버튼 이벤트 (스니펫을 뼈대 HTML로 감싸고, 스크립트는 현재 오리진으로 로드)
+previewHtmlBtn.addEventListener('click', () => {
+  const snippet = generateHTMLCode();
+  const fullHtml = buildPreviewHTML(snippet);
+  const blob = new Blob([fullHtml], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const newWindow = window.open(url, '_blank');
+  if (newWindow) {
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+  }
 });
 
 // 애니메이션 시작

@@ -203,6 +203,34 @@
       font-family: 'Courier New', monospace;
       font-size: 14px;
     }
+
+    .code-generation-container {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 2px solid #e0e0e0;
+    }
+
+    #generated-html-code {
+      width: 100%;
+      min-height: 300px;
+      padding: 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      background: #f8f9fa;
+      color: #333;
+      resize: vertical;
+      margin-top: 10px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    #generated-html-code:focus {
+      outline: none;
+      border-color: #667eea;
+    }
   </style>
 </head>
 <body>
@@ -246,6 +274,14 @@
           <label for="texture-cell2">mosaic_cell2.png</label>
         </div>
       </div>
+    </div>
+
+    <div class="code-generation-container" style="margin-top: 20px;">
+      <div class="controls">
+        <button id="generate-html-btn">HTML 코드 생성</button>
+        <button id="preview-html-btn" style="display: none;">새 창에서 확인</button>
+      </div>
+      <textarea id="generated-html-code" readonly style="display: none;"></textarea>
     </div>
   </div>
 
