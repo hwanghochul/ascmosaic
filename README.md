@@ -16,19 +16,13 @@ npm install
 npm run build
 ```
 
-### 예제 실행
+### Editor 실행
 
 ```bash
-npm run example:dev
+npm run dev
 ```
 
 브라우저에서 `http://localhost:5173` 접속
-
-### 예제 빌드
-
-```bash
-npm run example:build
-```
 
 ## 사용 방법
 
@@ -58,7 +52,7 @@ const sphere = createSphere(0.5, 0xff0000);
 ascmosaic/
 ├── src/              # 라이브러리 소스 코드
 │   └── index.ts      # 메인 진입점
-├── examples/         # 샘플 예제
+├── editor/           # Editor 애플리케이션
 │   ├── index.html
 │   └── main.ts
 ├── dist/             # 빌드 출력 (자동 생성)

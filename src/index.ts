@@ -19,10 +19,8 @@ export class AscMosaic {
   private asciiMosaicFilter: AsciiMosaicFilter | null = null;
   private animationFrameId: number | null = null;
   private isAnimating: boolean = false;
-  private container: HTMLElement;
 
   constructor(container: HTMLElement) {
-    this.container = container;
 
     // Scene 생성
     this.scene = new THREE.Scene();
