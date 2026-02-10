@@ -68,6 +68,44 @@
       margin-bottom: 10px;
     }
 
+    .texture-selector-container {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      margin-bottom: 10px;
+    }
+
+    .texture-selector-container label {
+      font-weight: 500;
+      color: #333;
+      min-width: 120px;
+    }
+
+    .texture-options {
+      display: flex;
+      gap: 15px;
+      flex: 1;
+    }
+
+    .texture-option {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .texture-option input[type="radio"] {
+      cursor: pointer;
+    }
+
+    .texture-option label {
+      cursor: pointer;
+      font-weight: normal;
+      min-width: auto;
+    }
+
     .slider-container label {
       font-weight: 500;
       color: #333;
@@ -186,8 +224,8 @@
 
     <div class="slider-container" id="noise-intensity-container" style="display: none;">
       <label for="noise-intensity-slider">노이즈 강도:</label>
-      <input type="range" id="noise-intensity-slider" min="0" max="100" value="20" step="1">
-      <span class="slider-value" id="noise-intensity-value">0.20</span>
+      <input type="range" id="noise-intensity-slider" min="0" max="100" value="0" step="1">
+      <span class="slider-value" id="noise-intensity-value">0.00</span>
     </div>
 
     <div class="slider-container" id="noise-fps-container" style="display: none;">
@@ -196,15 +234,18 @@
       <span class="slider-value" id="noise-fps-value">10</span>
     </div>
 
-    <div class="info">
-      <h3>📚 사용 방법</h3>
-      <p>
-        이 예제는 <code>AscMosaic</code> 라이브러리를 테스트하는 샘플입니다.<br>
-        화면에 지구본이 표시되며 자동으로 회전합니다.<br>
-        마우스로 드래그하여 지구본을 회전시키고, 휠로 줌 인/아웃할 수 있습니다.<br>
-        위 버튼들을 클릭하여 다양한 3D 객체를 추가하고 확인할 수 있습니다.<br>
-        "ASCII 필터 토글" 버튼을 클릭하면 FBO와 쉐이더를 사용한 ASCII 모자이크 필터가 적용됩니다.
-      </p>
+    <div class="texture-selector-container" id="texture-selector-container" style="display: none;">
+      <label>텍스처 선택:</label>
+      <div class="texture-options">
+        <div class="texture-option">
+          <input type="radio" id="texture-cell1" name="texture-select" value="/textures/mosaic_cell.png" checked>
+          <label for="texture-cell1">mosaic_cell.png</label>
+        </div>
+        <div class="texture-option">
+          <input type="radio" id="texture-cell2" name="texture-select" value="/textures/mosaic_cell2.png">
+          <label for="texture-cell2">mosaic_cell2.png</label>
+        </div>
+      </div>
     </div>
   </div>
 
