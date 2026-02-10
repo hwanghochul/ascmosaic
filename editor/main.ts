@@ -198,7 +198,7 @@ mosaic.setupOrbitControls({
   zoomSpeed: 0.1,
 });
 
-// HTML 스니펫 생성 (설정만 인라인, 로직은 외부 스크립트)
+// HTML 스니펫 생성 (컨테이너별 data 설정, 로직은 외부 스크립트 — 여러 인스턴스 시 div만 복사·스크립트는 한 번만)
 function generateHTMLCode(): string {
   const config = {
     mosaicSize: currentMosaicSize,
@@ -208,10 +208,8 @@ function generateHTMLCode(): string {
     noiseIntensity: currentNoiseIntensity,
     noiseFPS: currentNoiseFPS,
   };
-  return `<div id="canvas-container" class="canvas-container" style="width:100%;height:500px;"></div>
-<script>
-window.ASC_MOSAIC_CONFIG = ${JSON.stringify(config, null, 2)};
-</script>
+  const configJson = JSON.stringify(config);
+  return `<div class="canvas-container ascmosaic" style="width:100%;height:500px;" data-ascmosaic-config='${configJson}'></div>
 <script type="module" src="./ascmosaic-app.js"></script>`;
 }
 

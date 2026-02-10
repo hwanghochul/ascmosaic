@@ -1,6 +1,7 @@
 /**
  * AscMosaic 스니펫용 앱 진입점.
- * window.ASC_MOSAIC_CONFIG를 읽어 지구본 + 모자이크 필터를 초기화합니다.
+ * .ascmosaic 컨테이너를 찾아 data-ascmosaic-config 별로 지구본 + 모자이크 필터를 초기화합니다.
+ * 한 HTML에 여러 div.ascmosaic를 넣고 스크립트는 한 번만 포함하면 됩니다.
  */
 import { AscMosaic } from '../src/index';
 
@@ -26,14 +27,30 @@ function resolveTextureUrl(url: string): string {
   return url;
 }
 
-(async () => {
-  const config = window.ASC_MOSAIC_CONFIG ?? {};
+interface InstanceConfig {
+  mosaicSize?: number;
+  mosaicCellTextureUrl?: string;
+  cellCount?: number;
+  backgroundColor?: number;
+  noiseIntensity?: number;
+  noiseFPS?: number;
+}
 
-  const container = document.getElementById('canvas-container');
-  if (!container) throw new Error('canvas-container element not found');
+async function initContainer(container: HTMLElement): Promise<AscMosaic | null> {
+  if (container.getAttribute('data-ascmosaic-initialized') === 'true') return null;
+
+  let config: InstanceConfig = {};
+  const raw = container.getAttribute('data-ascmosaic-config');
+  if (raw) {
+    try {
+      config = JSON.parse(raw) as InstanceConfig;
+    } catch {
+      config = {};
+    }
+  }
+  if (!raw && window.ASC_MOSAIC_CONFIG) config = window.ASC_MOSAIC_CONFIG;
 
   const mosaic = new AscMosaic(container);
-
   mosaic.addLights();
   mosaic.addEarth({
     radius: 2,
@@ -60,9 +77,24 @@ function resolveTextureUrl(url: string): string {
     noiseFPS: config.noiseFPS ?? 10,
   });
 
+  container.setAttribute('data-ascmosaic-initialized', 'true');
+  return mosaic;
+}
+
+(async () => {
+  const containers = document.querySelectorAll<HTMLElement>('.ascmosaic');
+  const instances: AscMosaic[] = [];
+
+  for (const el of containers) {
+    const mosaic = await initContainer(el);
+    if (mosaic) instances.push(mosaic);
+  }
+
+  if (instances.length === 0) return;
+
   function animate() {
     requestAnimationFrame(animate);
-    mosaic.renderOnce();
+    for (const m of instances) m.renderOnce();
   }
   animate();
 })();
