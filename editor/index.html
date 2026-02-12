@@ -204,6 +204,33 @@
       font-size: 14px;
     }
 
+    .texture-upload-container {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      margin-bottom: 10px;
+    }
+
+    .texture-upload-container label {
+      font-weight: 500;
+      color: #333;
+      min-width: 120px;
+    }
+
+    .texture-upload-area {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+    }
+
+    .texture-upload-area input[type="file"] {
+      font-size: 13px;
+    }
+
     .code-generation-container {
       margin-top: 20px;
       padding-top: 20px;
@@ -262,6 +289,12 @@
       <span class="slider-value" id="noise-fps-value">10</span>
     </div>
 
+    <div class="slider-container" id="cell-count-container" style="display: none;">
+      <label for="cell-count-slider">셀 개수:</label>
+      <input type="range" id="cell-count-slider" min="2" max="20" value="6" step="1">
+      <span class="slider-value" id="cell-count-value">6</span>
+    </div>
+
     <div class="texture-selector-container" id="texture-selector-container" style="display: none;">
       <label>텍스처 선택:</label>
       <div class="texture-options">
@@ -273,6 +306,19 @@
           <input type="radio" id="texture-cell2" name="texture-select" value="/textures/mosaic_cell2.png">
           <label for="texture-cell2">mosaic_cell2.png</label>
         </div>
+        <div class="texture-option">
+          <input type="radio" id="texture-upload-radio" name="texture-select" value="__upload__" disabled>
+          <label for="texture-upload-radio" id="texture-upload-label">업로드 텍스처</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="texture-upload-container" id="texture-upload-container" style="display: none;">
+      <label>텍스처 업로드:</label>
+      <div class="texture-upload-area">
+        <input type="file" id="texture-upload-input" accept="image/png,image/jpeg,image/webp">
+        <img id="texture-upload-preview" style="display:none; max-height:48px; border-radius:4px; border:1px solid #ddd;">
+        <span id="texture-upload-name" style="color:#666; font-size:13px;"></span>
       </div>
     </div>
 

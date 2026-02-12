@@ -18,6 +18,15 @@ const noiseFPSSlider = document.getElementById('noise-fps-slider')! as HTMLInput
 const noiseFPSValue = document.getElementById('noise-fps-value')!;
 const textureSelectorContainer = document.getElementById('texture-selector-container')!;
 const textureSelectors = document.querySelectorAll('input[name="texture-select"]') as NodeListOf<HTMLInputElement>;
+const cellCountContainer = document.getElementById('cell-count-container')!;
+const cellCountSlider = document.getElementById('cell-count-slider')! as HTMLInputElement;
+const cellCountValue = document.getElementById('cell-count-value')!;
+const textureUploadContainer = document.getElementById('texture-upload-container')!;
+const textureUploadInput = document.getElementById('texture-upload-input')! as HTMLInputElement;
+const textureUploadPreview = document.getElementById('texture-upload-preview')! as HTMLImageElement;
+const textureUploadName = document.getElementById('texture-upload-name')!;
+const textureUploadRadio = document.getElementById('texture-upload-radio')! as HTMLInputElement;
+const textureUploadLabel = document.getElementById('texture-upload-label')!;
 const generateHtmlBtn = document.getElementById('generate-html-btn')!;
 const previewHtmlBtn = document.getElementById('preview-html-btn')!;
 const generatedHtmlCode = document.getElementById('generated-html-code')! as HTMLTextAreaElement;
@@ -87,6 +96,7 @@ function animate() {
 let currentMosaicSize = 10;
 let currentNoiseIntensity = 0.0;
 let currentNoiseFPS = 10;
+let currentCellCount = 6;
 let currentTextureUrl = '/textures/mosaic_cell.png';
 
 // ASCII 필터 토글 버튼
@@ -95,7 +105,7 @@ asciiToggleBtn.addEventListener('click', async () => {
     await mosaic.toggleAsciiMosaicFilter({
       mosaicSize: currentMosaicSize, // 모자이크 블록 크기
       mosaicCellTextureUrl: currentTextureUrl, // 모자이크 셀 아틀라스
-      cellCount: 6, // 아틀라스의 셀 개수 (가로 방향)
+      cellCount: currentCellCount, // 아틀라스의 셀 개수 (가로 방향)
       backgroundColor: 0xffffff, // 흰색 배경
       noiseIntensity: currentNoiseIntensity, // 노이즈 강도 (0.0 ~ 1.0)
       noiseFPS: currentNoiseFPS, // 노이즈 업데이트 FPS
@@ -105,17 +115,21 @@ asciiToggleBtn.addEventListener('click', async () => {
     if (mosaic.isAsciiMosaicFilterEnabled()) {
       asciiToggleBtn.textContent = 'ASCII 필터 끄기';
       asciiToggleBtn.style.background = '#28a745';
-      pixelSizeContainer.style.display = 'flex'; // 슬라이더 표시
-      noiseIntensityContainer.style.display = 'flex'; // 노이즈 강도 슬라이더 표시
-      noiseFPSContainer.style.display = 'flex'; // 노이즈 FPS 슬라이더 표시
-      textureSelectorContainer.style.display = 'flex'; // 텍스처 선택 표시
+      pixelSizeContainer.style.display = 'flex';
+      noiseIntensityContainer.style.display = 'flex';
+      noiseFPSContainer.style.display = 'flex';
+      cellCountContainer.style.display = 'flex';
+      textureSelectorContainer.style.display = 'flex';
+      textureUploadContainer.style.display = 'flex';
     } else {
       asciiToggleBtn.textContent = 'ASCII 필터 토글';
       asciiToggleBtn.style.background = '#667eea';
-      pixelSizeContainer.style.display = 'none'; // 슬라이더 숨김
-      noiseIntensityContainer.style.display = 'none'; // 노이즈 강도 슬라이더 숨김
-      noiseFPSContainer.style.display = 'none'; // 노이즈 FPS 슬라이더 숨김
-      textureSelectorContainer.style.display = 'none'; // 텍스처 선택 숨김
+      pixelSizeContainer.style.display = 'none';
+      noiseIntensityContainer.style.display = 'none';
+      noiseFPSContainer.style.display = 'none';
+      cellCountContainer.style.display = 'none';
+      textureSelectorContainer.style.display = 'none';
+      textureUploadContainer.style.display = 'none';
     }
   } catch (error) {
     console.error('ASCII 필터 토글 오류:', error);
@@ -159,6 +173,26 @@ noiseFPSSlider.addEventListener('input', (e) => {
   }
 });
 
+// 셀 개수 슬라이더 이벤트
+cellCountSlider.addEventListener('input', async (e) => {
+  const count = parseInt((e.target as HTMLInputElement).value);
+  currentCellCount = count;
+  cellCountValue.textContent = count.toString();
+
+  // 셀 개수는 런타임 변경이 불가하므로 필터를 재생성
+  if (mosaic.isAsciiMosaicFilterEnabled()) {
+    await mosaic.disableAsciiMosaicFilter();
+    await mosaic.enableAsciiMosaicFilter({
+      mosaicSize: currentMosaicSize,
+      mosaicCellTextureUrl: currentTextureUrl,
+      cellCount: currentCellCount,
+      backgroundColor: 0xffffff,
+      noiseIntensity: currentNoiseIntensity,
+      noiseFPS: currentNoiseFPS,
+    });
+  }
+});
+
 // 텍스처 선택 이벤트
 textureSelectors.forEach(selector => {
   selector.addEventListener('change', async (e) => {
@@ -171,13 +205,70 @@ textureSelectors.forEach(selector => {
       await mosaic.enableAsciiMosaicFilter({
         mosaicSize: currentMosaicSize,
         mosaicCellTextureUrl: currentTextureUrl,
-        cellCount: 6,
+        cellCount: currentCellCount,
         backgroundColor: 0xffffff,
         noiseIntensity: currentNoiseIntensity,
         noiseFPS: currentNoiseFPS,
       });
     }
   });
+});
+
+// 텍스처 업로드 이벤트: 파일을 data URL로 변환 후 필터에 적용
+let uploadedTextureDataUrl: string | null = null;
+
+textureUploadInput.addEventListener('change', async () => {
+  const file = textureUploadInput.files?.[0];
+  if (!file) return;
+
+  // 파일을 data URL로 변환
+  const reader = new FileReader();
+  reader.onload = async () => {
+    uploadedTextureDataUrl = reader.result as string;
+
+    // 미리보기 표시
+    textureUploadPreview.src = uploadedTextureDataUrl;
+    textureUploadPreview.style.display = 'inline';
+    textureUploadName.textContent = file.name;
+
+    // 업로드 라디오 버튼 활성화 + 선택
+    textureUploadRadio.disabled = false;
+    textureUploadRadio.checked = true;
+    textureUploadLabel.textContent = file.name;
+    currentTextureUrl = uploadedTextureDataUrl;
+
+    // 필터 활성화 중이면 새 텍스처로 재적용
+    if (mosaic.isAsciiMosaicFilterEnabled()) {
+      await mosaic.disableAsciiMosaicFilter();
+      await mosaic.enableAsciiMosaicFilter({
+        mosaicSize: currentMosaicSize,
+        mosaicCellTextureUrl: uploadedTextureDataUrl,
+        cellCount: currentCellCount,
+        backgroundColor: 0xffffff,
+        noiseIntensity: currentNoiseIntensity,
+        noiseFPS: currentNoiseFPS,
+      });
+    }
+  };
+  reader.readAsDataURL(file);
+});
+
+// 업로드 라디오 선택 시 (이미 업로드된 텍스처 재선택)
+textureUploadRadio.addEventListener('change', async () => {
+  if (textureUploadRadio.checked && uploadedTextureDataUrl) {
+    currentTextureUrl = uploadedTextureDataUrl;
+    if (mosaic.isAsciiMosaicFilterEnabled()) {
+      await mosaic.disableAsciiMosaicFilter();
+      await mosaic.enableAsciiMosaicFilter({
+        mosaicSize: currentMosaicSize,
+        mosaicCellTextureUrl: uploadedTextureDataUrl,
+        cellCount: currentCellCount,
+        backgroundColor: 0xffffff,
+        noiseIntensity: currentNoiseIntensity,
+        noiseFPS: currentNoiseFPS,
+      });
+    }
+  }
 });
 
 // 조명 추가 (지구본을 위해 필요)
@@ -203,7 +294,7 @@ function generateHTMLCode(): string {
   const config = {
     mosaicSize: currentMosaicSize,
     mosaicCellTextureUrl: currentTextureUrl,
-    cellCount: 6,
+    cellCount: currentCellCount,
     backgroundColor: 0xffffff,
     noiseIntensity: currentNoiseIntensity,
     noiseFPS: currentNoiseFPS,
