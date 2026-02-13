@@ -3,7 +3,7 @@ import {
   AsciiMosaicFilter,
   AsciiMosaicFilterOptions,
 } from './asciiMosaicFilter';
-import { createEarth, EarthOptions } from './earth';
+import { createTexturedMesh, TexturedMeshOptions } from './texturedMesh';
 import { OrbitControls, OrbitControlsOptions } from './orbitControls';
 
 /**
@@ -67,10 +67,10 @@ export class AscMosaic {
   }
 
   /**
-   * 지구본을 추가합니다
+   * 지구본(텍스처 메시)을 추가합니다 (구/큐브/평면 선택 가능)
    */
-  addEarth(options?: EarthOptions): THREE.Mesh {
-    // 기존 지구본 제거
+  addEarth(options?: TexturedMeshOptions): THREE.Mesh {
+    // 기존 메시 제거
     if (this.earth) {
       this.scene.remove(this.earth);
       if (this.earth.geometry) {
@@ -81,8 +81,7 @@ export class AscMosaic {
       }
     }
 
-    // 지구본 생성
-    this.earth = createEarth(options);
+    this.earth = createTexturedMesh(options);
     this.scene.add(this.earth);
 
     // 카메라 위치 조정 (지구본 중심으로)
@@ -357,7 +356,13 @@ export {
 } from './asciiMosaicFilter';
 
 // 지구본 내보내기
-export { createEarth, type EarthOptions } from './earth';
+export {
+  createTexturedMesh,
+  createTexturedMesh as createEarth,
+  type TexturedMeshOptions,
+  type TexturedMeshOptions as EarthOptions,
+  type TexturedMeshShape,
+} from './texturedMesh';
 
 // OrbitControls 내보내기
 export { OrbitControls, type OrbitControlsOptions } from './orbitControls';

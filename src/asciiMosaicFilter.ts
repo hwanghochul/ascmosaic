@@ -201,7 +201,7 @@ export class AsciiMosaicFilter {
   private async initAtlas(
     options: AsciiMosaicFilterOptions
   ): Promise<void> {
-    const textureUrl = options.mosaicCellTextureUrl ?? '/textures/mosaic_cell.png';
+    const textureUrl = options.mosaicCellTextureUrl ?? '/resource/mosaic_cell.png';
     const cellCount = options.cellCount ?? 10; // 기본값
     
     const textureLoader = new THREE.TextureLoader();

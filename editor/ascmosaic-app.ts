@@ -8,8 +8,14 @@ import { AscMosaic } from '../src/index';
 declare global {
   interface Window {
     ASC_MOSAIC_CONFIG?: {
+      shape?: 'sphere' | 'cube' | 'plane';
+      radius?: number;
+      size?: number;
+      width?: number;
+      height?: number;
       mosaicSize?: number;
       mosaicCellTextureUrl?: string;
+      textureUrl?: string;
       cellCount?: number;
       backgroundColor?: number;
       noiseIntensity?: number;
@@ -28,8 +34,14 @@ function resolveTextureUrl(url: string): string {
 }
 
 interface InstanceConfig {
+  shape?: 'sphere' | 'cube' | 'plane';
+  radius?: number;
+  size?: number;
+  width?: number;
+  height?: number;
   mosaicSize?: number;
   mosaicCellTextureUrl?: string;
+  textureUrl?: string;
   cellCount?: number;
   backgroundColor?: number;
   noiseIntensity?: number;
@@ -52,12 +64,24 @@ async function initContainer(container: HTMLElement): Promise<AscMosaic | null> 
 
   const mosaic = new AscMosaic(container);
   mosaic.addLights();
-  mosaic.addEarth({
-    radius: 2,
-    widthSegments: 64,
-    heightSegments: 32,
-    textureUrl: resolveTextureUrl('/textures/earth.jpg'),
-  });
+
+  const shape = config.shape ?? 'sphere';
+  const earthOptions: Record<string, unknown> = {
+    shape,
+    textureUrl: resolveTextureUrl(config.textureUrl ?? '/resource/earth.jpg'),
+  };
+  if (shape === 'sphere') {
+    earthOptions.radius = config.radius ?? 2;
+    earthOptions.widthSegments = 64;
+    earthOptions.heightSegments = 32;
+  } else if (shape === 'cube') {
+    earthOptions.size = config.size ?? 4;
+  } else {
+    earthOptions.width = config.width ?? 4;
+    earthOptions.height = config.height ?? 4;
+  }
+  mosaic.addEarth(earthOptions);
+
   mosaic.setupOrbitControls({
     minDistance: 3,
     maxDistance: 10,
@@ -66,7 +90,7 @@ async function initContainer(container: HTMLElement): Promise<AscMosaic | null> 
   });
 
   const mosaicCellTextureUrl = resolveTextureUrl(
-    config.mosaicCellTextureUrl ?? '/textures/mosaic_cell.png'
+    config.mosaicCellTextureUrl ?? '/resource/mosaic_cell.png'
   );
   await mosaic.enableAsciiMosaicFilter({
     mosaicSize: config.mosaicSize ?? 10,
