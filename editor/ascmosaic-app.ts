@@ -3,16 +3,18 @@
  * .ascmosaic 컨테이너를 찾아 data-ascmosaic-config 별로 지구본 + 모자이크 필터를 초기화합니다.
  * 한 HTML에 여러 div.ascmosaic를 넣고 스크립트는 한 번만 포함하면 됩니다.
  */
-import { AscMosaic } from '../src/index';
+import { AscMosaic, type TexturedMeshOptions } from '../src/index';
 
 declare global {
   interface Window {
     ASC_MOSAIC_CONFIG?: {
-      shape?: 'sphere' | 'cube' | 'plane';
+      shape?: 'sphere' | 'cube' | 'plane' | 'glb';
       radius?: number;
       size?: number;
       width?: number;
       height?: number;
+      modelUrl?: string;
+      scale?: number;
       mosaicSize?: number;
       mosaicCellTextureUrl?: string;
       textureUrl?: string;
@@ -34,11 +36,13 @@ function resolveTextureUrl(url: string): string {
 }
 
 interface InstanceConfig {
-  shape?: 'sphere' | 'cube' | 'plane';
+  shape?: 'sphere' | 'cube' | 'plane' | 'glb';
   radius?: number;
   size?: number;
   width?: number;
   height?: number;
+  modelUrl?: string;
+  scale?: number;
   mosaicSize?: number;
   mosaicCellTextureUrl?: string;
   textureUrl?: string;
@@ -66,21 +70,24 @@ async function initContainer(container: HTMLElement): Promise<AscMosaic | null> 
   mosaic.addLights();
 
   const shape = config.shape ?? 'sphere';
-  const earthOptions: Record<string, unknown> = {
-    shape,
-    textureUrl: resolveTextureUrl(config.textureUrl ?? '/resource/earth.jpg'),
-  };
-  if (shape === 'sphere') {
-    earthOptions.radius = config.radius ?? 2;
-    earthOptions.widthSegments = 64;
-    earthOptions.heightSegments = 32;
-  } else if (shape === 'cube') {
-    earthOptions.size = config.size ?? 4;
+  const scale = config.scale ?? 1;
+  const earthOptions: TexturedMeshOptions = { shape, scale };
+  if (shape === 'glb') {
+    if (config.modelUrl) earthOptions.modelUrl = resolveTextureUrl(config.modelUrl);
   } else {
-    earthOptions.width = config.width ?? 4;
-    earthOptions.height = config.height ?? 4;
+    earthOptions.textureUrl = resolveTextureUrl(config.textureUrl ?? '/resource/earth.jpg');
+    if (shape === 'sphere') {
+      earthOptions.radius = config.radius ?? 2;
+      earthOptions.widthSegments = 64;
+      earthOptions.heightSegments = 32;
+    } else if (shape === 'cube') {
+      earthOptions.size = config.size ?? 4;
+    } else {
+      earthOptions.width = config.width ?? 4;
+      earthOptions.height = config.height ?? 4;
+    }
   }
-  mosaic.addEarth(earthOptions);
+  await mosaic.addEarth(earthOptions);
 
   mosaic.setupOrbitControls({
     minDistance: 3,

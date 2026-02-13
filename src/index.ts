@@ -14,7 +14,7 @@ export class AscMosaic {
   private camera: THREE.PerspectiveCamera;
   private renderer: THREE.WebGLRenderer;
   private cube: THREE.Mesh | null = null;
-  private earth: THREE.Mesh | null = null;
+  private earth: THREE.Object3D | null = null;
   private orbitControls: OrbitControls | null = null;
   private asciiMosaicFilter: AsciiMosaicFilter | null = null;
   private animationFrameId: number | null = null;
@@ -67,24 +67,23 @@ export class AscMosaic {
   }
 
   /**
-   * 지구본(텍스처 메시)을 추가합니다 (구/큐브/평면 선택 가능)
+   * 지구본(텍스처 메시 또는 GLB)을 추가합니다 (구/큐브/평면/glb 선택 가능)
    */
-  addEarth(options?: TexturedMeshOptions): THREE.Mesh {
-    // 기존 메시 제거
+  async addEarth(options?: TexturedMeshOptions): Promise<THREE.Object3D> {
     if (this.earth) {
       this.scene.remove(this.earth);
-      if (this.earth.geometry) {
-        this.earth.geometry.dispose();
-      }
-      if (this.earth.material instanceof THREE.Material) {
-        this.earth.material.dispose();
-      }
+      this.earth.traverse((obj) => {
+        if (obj instanceof THREE.Mesh) {
+          obj.geometry?.dispose();
+          if (obj.material instanceof THREE.Material) obj.material.dispose();
+        }
+      });
+      this.earth = null;
     }
 
-    this.earth = createTexturedMesh(options);
+    this.earth = await createTexturedMesh(options ?? {});
     this.scene.add(this.earth);
 
-    // 카메라 위치 조정 (지구본 중심으로)
     this.camera.position.set(0, 0, 5);
     this.camera.lookAt(0, 0, 0);
 
@@ -316,10 +315,12 @@ export class AscMosaic {
     }
 
     if (this.earth) {
-      this.earth.geometry.dispose();
-      if (this.earth.material instanceof THREE.Material) {
-        this.earth.material.dispose();
-      }
+      this.earth.traverse((obj) => {
+        if (obj instanceof THREE.Mesh) {
+          obj.geometry?.dispose();
+          if (obj.material instanceof THREE.Material) obj.material.dispose();
+        }
+      });
     }
 
     if (this.orbitControls) {

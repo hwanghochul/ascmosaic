@@ -26,6 +26,10 @@ const planeWidthSlider = document.getElementById('plane-width')! as HTMLInputEle
 const planeWidthValue = document.getElementById('plane-width-value')!;
 const planeHeightSlider = document.getElementById('plane-height')! as HTMLInputElement;
 const planeHeightValue = document.getElementById('plane-height-value')!;
+const modelSelectContainer = document.getElementById('model-select-container')!;
+const modelSelect = document.getElementById('model-select')! as HTMLSelectElement;
+const scaleSlider = document.getElementById('scale-slider')! as HTMLInputElement;
+const scaleValue = document.getElementById('scale-value')!;
 const textureSelectContainer = document.getElementById('texture-select-container')!;
 const textureSelect = document.getElementById('texture-select')! as HTMLSelectElement;
 const cellCountContainer = document.getElementById('cell-count-container')!;
@@ -48,9 +52,10 @@ function animate() {
 interface ResourceList {
   cells: string[];
   textures: string[];
+  models?: string[];
 }
 
-type ShapeType = 'sphere' | 'cube' | 'plane';
+type ShapeType = 'sphere' | 'cube' | 'plane' | 'glb';
 
 // 현재 설정값 저장
 let currentMosaicSize = 10;
@@ -64,33 +69,42 @@ let currentRadius = 2;
 let currentCubeSize = 4;
 let currentPlaneWidth = 4;
 let currentPlaneHeight = 4;
+let currentModelUrl = '';
+let currentScale = 1;
 
 function getEarthOptions() {
   const base: Record<string, unknown> = {
     shape: currentShape,
-    textureUrl: currentEarthTextureUrl,
+    scale: currentScale,
   };
-  if (currentShape === 'sphere') {
-    base.radius = currentRadius;
-    base.widthSegments = 64;
-    base.heightSegments = 32;
-  } else if (currentShape === 'cube') {
-    base.size = currentCubeSize;
+  if (currentShape === 'glb') {
+    base.modelUrl = currentModelUrl || undefined;
   } else {
-    base.width = currentPlaneWidth;
-    base.height = currentPlaneHeight;
+    base.textureUrl = currentEarthTextureUrl;
+    if (currentShape === 'sphere') {
+      base.radius = currentRadius;
+      base.widthSegments = 64;
+      base.heightSegments = 32;
+    } else if (currentShape === 'cube') {
+      base.size = currentCubeSize;
+    } else {
+      base.width = currentPlaneWidth;
+      base.height = currentPlaneHeight;
+    }
   }
   return base;
 }
 
-function applyEarth() {
-  mosaic.addEarth(getEarthOptions());
+async function applyEarth() {
+  await mosaic.addEarth(getEarthOptions());
 }
 
 function showShapeParams(shape: ShapeType) {
   shapeSphereParams.style.display = shape === 'sphere' ? 'flex' : 'none';
   shapeCubeParams.style.display = shape === 'cube' ? 'flex' : 'none';
   shapePlaneParams.style.display = shape === 'plane' ? 'flex' : 'none';
+  modelSelectContainer.style.display = shape === 'glb' ? 'flex' : 'none';
+  textureSelectContainer.style.display = shape === 'glb' ? 'none' : 'flex';
 }
 
 // 초기 도형 서브 UI 표시
@@ -206,44 +220,57 @@ cellSelect.addEventListener('change', async () => {
 });
 
 // 도형 선택 이벤트
-shapeSelect.addEventListener('change', () => {
+shapeSelect.addEventListener('change', async () => {
   currentShape = shapeSelect.value as ShapeType;
   showShapeParams(currentShape);
-  applyEarth();
+  await applyEarth();
 });
 
 // 구 반지름
-sphereRadiusSlider.addEventListener('input', () => {
+sphereRadiusSlider.addEventListener('input', async () => {
   currentRadius = parseFloat(sphereRadiusSlider.value);
   sphereRadiusValue.textContent = currentRadius.toFixed(1);
-  applyEarth();
+  await applyEarth();
 });
 
 // 큐브 크기
-cubeSizeSlider.addEventListener('input', () => {
+cubeSizeSlider.addEventListener('input', async () => {
   currentCubeSize = parseFloat(cubeSizeSlider.value);
   cubeSizeValue.textContent = currentCubeSize.toFixed(1);
-  applyEarth();
+  await applyEarth();
 });
 
 // 평면 가로/세로
-planeWidthSlider.addEventListener('input', () => {
+planeWidthSlider.addEventListener('input', async () => {
   currentPlaneWidth = parseFloat(planeWidthSlider.value);
   planeWidthValue.textContent = currentPlaneWidth.toFixed(1);
-  applyEarth();
+  await applyEarth();
 });
-planeHeightSlider.addEventListener('input', () => {
+planeHeightSlider.addEventListener('input', async () => {
   currentPlaneHeight = parseFloat(planeHeightSlider.value);
   planeHeightValue.textContent = currentPlaneHeight.toFixed(1);
-  applyEarth();
+  await applyEarth();
+});
+
+// 크기(scale) 슬라이더
+scaleSlider.addEventListener('input', async () => {
+  currentScale = parseFloat(scaleSlider.value);
+  scaleValue.textContent = currentScale.toFixed(1);
+  await applyEarth();
+});
+
+// GLB 모델 선택 이벤트
+modelSelect.addEventListener('change', async () => {
+  currentModelUrl = modelSelect.value;
+  await applyEarth();
 });
 
 // 텍스처 선택 이벤트
-textureSelect.addEventListener('change', () => {
+textureSelect.addEventListener('change', async () => {
   const value = textureSelect.value;
   if (!value) return;
   currentEarthTextureUrl = value;
-  applyEarth();
+  await applyEarth();
 });
 
 // 조명 추가 (지구본을 위해 필요)
@@ -261,7 +288,7 @@ mosaic.setupOrbitControls({
 function loadResourceList(): Promise<void> {
   return fetch('/resource/resource_list.json')
     .then((res) => (res.ok ? res.json() : Promise.reject(new Error('resource_list.json 로드 실패'))))
-    .then((list: ResourceList) => {
+    .then(async (list: ResourceList) => {
       const base = '/resource/';
       cellSelect.innerHTML = '';
       (list.cells ?? []).forEach((filename) => {
@@ -277,19 +304,27 @@ function loadResourceList(): Promise<void> {
         opt.textContent = filename;
         textureSelect.appendChild(opt);
       });
+      modelSelect.innerHTML = '';
+      (list.models ?? []).forEach((filename) => {
+        const opt = document.createElement('option');
+        opt.value = base + filename;
+        opt.textContent = filename;
+        modelSelect.appendChild(opt);
+      });
       if (list.cells?.length) currentCellUrl = base + list.cells[0];
       if (list.textures?.length) currentEarthTextureUrl = base + list.textures[0];
+      if (list.models?.length) currentModelUrl = base + list.models[0];
       showShapeParams(currentShape);
-      applyEarth();
+      return applyEarth();
     })
-    .catch((err) => {
+    .catch(async (err) => {
       console.warn('resource_list.json 로드 실패, 기본값 사용:', err);
       showShapeParams(currentShape);
-      applyEarth();
+      await applyEarth();
     });
 }
 
-// HTML 스니펫 생성 (컨테이너별 data 설정, 로직은 외부 스크립트 — 여러 인스턴스 시 div만 복사·스크립트는 한 번만)
+// HTML 스니펫 생성 (도형·텍스처·필터 설정 포함, 스니펫/새 창 미리보기에서 동일 config 사용)
 function generateHTMLCode(): string {
   const config = {
     shape: currentShape,
@@ -297,6 +332,8 @@ function generateHTMLCode(): string {
     size: currentCubeSize,
     width: currentPlaneWidth,
     height: currentPlaneHeight,
+    modelUrl: currentModelUrl || undefined,
+    scale: currentScale,
     mosaicSize: currentMosaicSize,
     mosaicCellTextureUrl: currentCellUrl,
     textureUrl: currentEarthTextureUrl,
