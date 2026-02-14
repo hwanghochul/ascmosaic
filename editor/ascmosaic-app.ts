@@ -24,7 +24,7 @@ declare global {
       noiseFPS?: number;
       cameraPosition?: { x: number; y: number; z: number };
       cameraRotation?: { x: number; y: number; z: number };
-      controlMode?: 'orbit' | 'fixed';
+      controlMode?: 'orbit' | 'fixed' | 'tilt';
     };
     /** Blob 미리보기 등에서 텍스처를 같은 오리진으로 로드할 때 사용 (예: 'https://localhost:5173') */
     ASC_MOSAIC_BASE_URL?: string;
@@ -55,7 +55,7 @@ interface InstanceConfig {
   noiseFPS?: number;
   cameraPosition?: { x: number; y: number; z: number };
   cameraRotation?: { x: number; y: number; z: number };
-  controlMode?: 'orbit' | 'fixed';
+  controlMode?: 'orbit' | 'fixed' | 'tilt';
 }
 
 async function initContainer(container: HTMLElement): Promise<AscMosaic | null> {
@@ -113,7 +113,7 @@ async function initContainer(container: HTMLElement): Promise<AscMosaic | null> 
   }
   camera.updateProjectionMatrix();
 
-  // 컨트롤 모드에 따라 OrbitControls 설정
+  // 컨트롤 모드에 따라 컨트롤 설정
   const controlMode = config.controlMode ?? 'orbit';
   if (controlMode === 'orbit') {
     mosaic.setupOrbitControls({
@@ -122,8 +122,10 @@ async function initContainer(container: HTMLElement): Promise<AscMosaic | null> 
       rotateSpeed: 1.0,
       zoomSpeed: 0.1,
     });
+  } else if (controlMode === 'tilt') {
+    mosaic.setupTiltControls();
   }
-  // 'fixed' 모드는 OrbitControls를 설정하지 않음
+  // 'fixed' 모드는 컨트롤을 설정하지 않음
 
   const mosaicCellTextureUrl = resolveTextureUrl(
     config.mosaicCellTextureUrl ?? '/resource/mosaic_cell.png'

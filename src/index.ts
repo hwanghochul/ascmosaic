@@ -17,11 +17,16 @@ export class AscMosaic {
   private model: THREE.Object3D | null = null;
   private modelOptions: TexturedMeshOptions | null = null;
   private orbitControls: OrbitControls | null = null;
+  private tiltControlsEnabled: boolean = false;
+  private tiltMouseMoveHandler: ((e: MouseEvent) => void) | null = null;
+  private tiltMouseLeaveHandler: (() => void) | null = null;
+  private container: HTMLElement;
   private asciiMosaicFilter: AsciiMosaicFilter | null = null;
   private animationFrameId: number | null = null;
   private isAnimating: boolean = false;
 
   constructor(container: HTMLElement) {
+    this.container = container;
 
     // Scene 생성
     this.scene = new THREE.Scene();
@@ -142,6 +147,68 @@ export class AscMosaic {
     );
 
     return this.orbitControls;
+  }
+
+  /**
+   * 기울임 컨트롤을 설정합니다 (마우스 위치에 따라 모델이 기울어짐)
+   */
+  setupTiltControls(): void {
+    // 기존 컨트롤 제거
+    if (this.orbitControls) {
+      this.orbitControls.dispose();
+      this.orbitControls = null;
+    }
+    this.disableTiltControls(); // 기존 이벤트 리스너 제거
+
+    this.tiltControlsEnabled = true;
+    const maxTiltAngle = Math.PI / 6; // 최대 30도 기울임
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!this.tiltControlsEnabled || !this.model) return;
+
+      const rect = this.container.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      
+      const mouseX = e.clientX - centerX;
+      const mouseY = e.clientY - centerY;
+      
+      // 중심에서의 거리 (정규화: -1 ~ 1)
+      const maxDistance = Math.min(rect.width, rect.height) / 2;
+      const normalizedX = Math.max(-1, Math.min(1, mouseX / maxDistance));
+      const normalizedY = Math.max(-1, Math.min(1, -mouseY / maxDistance)); // Y는 반전 (위쪽이 양수)
+      
+      // 기울임 각도 계산
+      this.model.rotation.y = -normalizedX * maxTiltAngle; // 오른쪽이면 Y축으로 반대 방향 회전
+      this.model.rotation.x = normalizedY * maxTiltAngle; // 위쪽이면 위로 기울임
+    };
+
+    const handleMouseLeave = () => {
+      if (this.model) {
+        this.model.rotation.x = 0;
+        this.model.rotation.y = 0;
+      }
+    };
+
+    this.tiltMouseMoveHandler = handleMouseMove;
+    this.tiltMouseLeaveHandler = handleMouseLeave;
+    this.container.addEventListener('mousemove', handleMouseMove);
+    this.container.addEventListener('mouseleave', handleMouseLeave);
+  }
+
+  /**
+   * 기울임 컨트롤을 비활성화합니다
+   */
+  disableTiltControls(): void {
+    this.tiltControlsEnabled = false;
+    if (this.tiltMouseMoveHandler) {
+      this.container.removeEventListener('mousemove', this.tiltMouseMoveHandler);
+      this.tiltMouseMoveHandler = null;
+    }
+    if (this.tiltMouseLeaveHandler) {
+      this.container.removeEventListener('mouseleave', this.tiltMouseLeaveHandler);
+      this.tiltMouseLeaveHandler = null;
+    }
   }
 
   /**
@@ -333,6 +400,13 @@ export class AscMosaic {
   }
 
   /**
+   * OrbitControls 가져오기
+   */
+  getOrbitControls(): OrbitControls | null {
+    return this.orbitControls;
+  }
+
+  /**
    * 리소스를 정리합니다
    */
   dispose(): void {
@@ -358,6 +432,8 @@ export class AscMosaic {
       this.orbitControls.dispose();
       this.orbitControls = null;
     }
+
+    this.disableTiltControls();
 
     if (this.asciiMosaicFilter) {
       this.asciiMosaicFilter.dispose();

@@ -72,7 +72,7 @@ let currentPlaneWidth = 4;
 let currentPlaneHeight = 4;
 let currentModelUrl = '';
 let currentScale = 1;
-let currentControlMode: 'orbit' | 'fixed' = 'orbit';
+let currentControlMode: 'orbit' | 'fixed' | 'tilt' = 'orbit';
 
 function getEarthOptions() {
   const base: Record<string, unknown> = {
@@ -277,7 +277,27 @@ textureSelect.addEventListener('change', async () => {
 
 // 컨트롤 모드 선택 이벤트
 controlModeSelect.addEventListener('change', () => {
-  currentControlMode = controlModeSelect.value as 'orbit' | 'fixed';
+  currentControlMode = controlModeSelect.value as 'orbit' | 'fixed' | 'tilt';
+  
+  // 에디터에서도 즉시 적용
+  if (currentControlMode === 'orbit') {
+    mosaic.disableTiltControls();
+    mosaic.setupOrbitControls({
+      minDistance: 3,
+      maxDistance: 10,
+      rotateSpeed: 1.0,
+      zoomSpeed: 0.1,
+    });
+  } else if (currentControlMode === 'tilt') {
+    mosaic.setupTiltControls();
+  } else {
+    // fixed: 모든 컨트롤 제거
+    mosaic.disableTiltControls();
+    const orbitControls = mosaic.getOrbitControls();
+    if (orbitControls) {
+      orbitControls.dispose();
+    }
+  }
 });
 
 // 조명 추가
