@@ -52,6 +52,35 @@ const generateHtmlBtn = document.getElementById('generate-html-btn')!;
 const previewHtmlBtn = document.getElementById('preview-html-btn')!;
 const generatedHtmlCode = document.getElementById('generated-html-code')! as HTMLTextAreaElement;
 
+// 아코디언 초기화
+function initAccordion(): void {
+  const headers = document.querySelectorAll('.accordion-header');
+  headers.forEach((header) => {
+    header.addEventListener('click', () => {
+      const section = header.closest('.accordion-section');
+      if (!section) return;
+      const content = section.querySelector('.accordion-content');
+      if (!content) return;
+      const isOpen = section.classList.contains('open');
+      if (isOpen) {
+        section.classList.remove('open');
+        (content as HTMLElement).style.display = 'none';
+      } else {
+        section.classList.add('open');
+        (content as HTMLElement).style.display = 'block';
+      }
+    });
+  });
+  // 초기 상태: open인 섹션만 콘텐츠 표시
+  document.querySelectorAll('.accordion-section').forEach((section) => {
+    const content = section.querySelector('.accordion-content');
+    if (content) {
+      (content as HTMLElement).style.display = section.classList.contains('open') ? 'block' : 'none';
+    }
+  });
+}
+initAccordion();
+
 // AscMosaic 인스턴스 생성
 const mosaic = new AscMosaic(canvasContainer);
 
@@ -135,7 +164,7 @@ async function applyEarth() {
 function showShapeParams(shape: ShapeType) {
   shapeSphereParams.style.display = shape === 'sphere' ? 'flex' : 'none';
   shapeCubeParams.style.display = shape === 'cube' ? 'flex' : 'none';
-  shapePlaneParams.style.display = shape === 'plane' ? 'flex' : 'none';
+  shapePlaneParams.style.display = shape === 'plane' ? 'block' : 'none';
   modelSelectContainer.style.display = shape === 'glb' ? 'flex' : 'none';
   textureSelectContainer.style.display = shape === 'glb' ? 'none' : 'flex';
 }
@@ -156,7 +185,7 @@ asciiToggleBtn.addEventListener('click', async () => {
       noiseFPSContainer.style.display = 'flex';
       cellCountContainer.style.display = 'flex';
       cellSelectContainer.style.display = 'flex';
-      setConfigContainer.style.display = 'flex';
+      setConfigContainer.style.display = 'block';
       setCountValue.textContent = String(currentSetCount);
     } else {
       asciiToggleBtn.textContent = 'ASCII 필터 토글';
@@ -312,7 +341,7 @@ controlModeSelect.addEventListener('change', () => {
   // 기울임 반전 UI 및 설정 UI 표시/숨김
   if (currentControlMode === 'tilt') {
     tiltInvertContainer.style.display = 'flex';
-    tiltSettingsContainer.style.display = 'flex';
+    tiltSettingsContainer.style.display = 'block';
   } else {
     tiltInvertContainer.style.display = 'none';
     tiltSettingsContainer.style.display = 'none';
@@ -500,10 +529,7 @@ ${baseUrlScript}${bodyContent}
 generateHtmlBtn.addEventListener('click', () => {
   const htmlCode = generateHTMLCode();
   generatedHtmlCode.value = htmlCode;
-  generatedHtmlCode.style.display = 'block';
-  previewHtmlBtn.style.display = 'inline-block';
-  
-  // 텍스트 선택 (복사하기 쉽게)
+  previewHtmlBtn.style.display = 'block';
   generatedHtmlCode.select();
 });
 
