@@ -32,6 +32,7 @@ const scaleSlider = document.getElementById('scale-slider')! as HTMLInputElement
 const scaleValue = document.getElementById('scale-value')!;
 const textureSelectContainer = document.getElementById('texture-select-container')!;
 const textureSelect = document.getElementById('texture-select')! as HTMLSelectElement;
+const controlModeSelect = document.getElementById('control-mode-select')! as HTMLSelectElement;
 const cellCountContainer = document.getElementById('cell-count-container')!;
 const cellCountSlider = document.getElementById('cell-count-slider')! as HTMLInputElement;
 const cellCountValue = document.getElementById('cell-count-value')!;
@@ -71,6 +72,7 @@ let currentPlaneWidth = 4;
 let currentPlaneHeight = 4;
 let currentModelUrl = '';
 let currentScale = 1;
+let currentControlMode: 'orbit' | 'fixed' = 'orbit';
 
 function getEarthOptions() {
   const base: Record<string, unknown> = {
@@ -273,6 +275,11 @@ textureSelect.addEventListener('change', async () => {
   await applyEarth();
 });
 
+// 컨트롤 모드 선택 이벤트
+controlModeSelect.addEventListener('change', () => {
+  currentControlMode = controlModeSelect.value as 'orbit' | 'fixed';
+});
+
 // 조명 추가
 mosaic.addLights();
 
@@ -352,7 +359,7 @@ function generateHTMLCode(): string {
       y: camera.rotation.y,
       z: camera.rotation.z,
     },
-    enableOrbitControls: false,
+    controlMode: currentControlMode,
   };
   const configJson = JSON.stringify(config);
   return `<div class="canvas-container ascmosaic" style="width:100%;height:500px;" data-ascmosaic-config='${configJson}'></div>

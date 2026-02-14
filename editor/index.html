@@ -71,7 +71,8 @@
     .cell-select-container,
     .texture-select-container,
     .shape-select-container,
-    .model-select-container {
+    .model-select-container,
+    .control-mode-select-container {
       display: flex;
       align-items: center;
       gap: 15px;
@@ -84,7 +85,8 @@
     .cell-select-container label,
     .texture-select-container label,
     .shape-select-container label,
-    .model-select-container label {
+    .model-select-container label,
+    .control-mode-select-container label {
       font-weight: 500;
       color: #333;
       min-width: 120px;
@@ -358,6 +360,14 @@
     <div class="texture-select-container" id="texture-select-container">
       <label for="texture-select">텍스처 선택:</label>
       <select id="texture-select" class="combo-select"></select>
+    </div>
+
+    <div class="control-mode-select-container" id="control-mode-select-container">
+      <label for="control-mode-select">컨트롤 모드:</label>
+      <select id="control-mode-select" class="combo-select">
+        <option value="orbit">오비트</option>
+        <option value="fixed">정지</option>
+      </select>
     </div>
 
     <div class="code-generation-container" style="margin-top: 20px;">

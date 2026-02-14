@@ -24,7 +24,7 @@ declare global {
       noiseFPS?: number;
       cameraPosition?: { x: number; y: number; z: number };
       cameraRotation?: { x: number; y: number; z: number };
-      enableOrbitControls?: boolean;
+      controlMode?: 'orbit' | 'fixed';
     };
     /** Blob 미리보기 등에서 텍스처를 같은 오리진으로 로드할 때 사용 (예: 'https://localhost:5173') */
     ASC_MOSAIC_BASE_URL?: string;
@@ -55,7 +55,7 @@ interface InstanceConfig {
   noiseFPS?: number;
   cameraPosition?: { x: number; y: number; z: number };
   cameraRotation?: { x: number; y: number; z: number };
-  enableOrbitControls?: boolean;
+  controlMode?: 'orbit' | 'fixed';
 }
 
 async function initContainer(container: HTMLElement): Promise<AscMosaic | null> {
@@ -113,8 +113,9 @@ async function initContainer(container: HTMLElement): Promise<AscMosaic | null> 
   }
   camera.updateProjectionMatrix();
 
-  // OrbitControls 설정 (enableOrbitControls가 false면 비활성화)
-  if (config.enableOrbitControls !== false) {
+  // 컨트롤 모드에 따라 OrbitControls 설정
+  const controlMode = config.controlMode ?? 'orbit';
+  if (controlMode === 'orbit') {
     mosaic.setupOrbitControls({
       minDistance: 3,
       maxDistance: 10,
@@ -122,6 +123,7 @@ async function initContainer(container: HTMLElement): Promise<AscMosaic | null> 
       zoomSpeed: 0.1,
     });
   }
+  // 'fixed' 모드는 OrbitControls를 설정하지 않음
 
   const mosaicCellTextureUrl = resolveTextureUrl(
     config.mosaicCellTextureUrl ?? '/resource/mosaic_cell.png'
