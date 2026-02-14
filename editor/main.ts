@@ -50,7 +50,91 @@ const setCountValue = document.getElementById('set-count-value')!;
 const setSelectionModeSelect = document.getElementById('set-selection-mode-select')! as HTMLSelectElement;
 const generateHtmlBtn = document.getElementById('generate-html-btn')!;
 const previewHtmlBtn = document.getElementById('preview-html-btn')!;
+const copyCodeBtn = document.getElementById('copy-code-btn')!;
+const realTimeCodeToggle = document.getElementById('realtime-code-toggle')! as HTMLInputElement;
 const generatedHtmlCode = document.getElementById('generated-html-code')! as HTMLTextAreaElement;
+const canvasWidthSlider = document.getElementById('canvas-width-slider')! as HTMLInputElement;
+const canvasWidthValue = document.getElementById('canvas-width-value')!;
+const canvasHeightSlider = document.getElementById('canvas-height-slider')! as HTMLInputElement;
+const canvasHeightValue = document.getElementById('canvas-height-value')!;
+
+let realTimeCodeGen = true;
+let currentCanvasWidth = 800;
+let currentCanvasHeight = 600;
+
+// URL에서 상태 복원
+function loadStateFromURL(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  const stateJson = params.get('state');
+  if (!stateJson) return false;
+  
+  try {
+    const state = JSON.parse(decodeURIComponent(stateJson));
+    
+    // 기본값으로 복원
+    if (state.mosaicSize !== undefined) currentMosaicSize = state.mosaicSize;
+    if (state.noiseIntensity !== undefined) currentNoiseIntensity = state.noiseIntensity;
+    if (state.noiseFPS !== undefined) currentNoiseFPS = state.noiseFPS;
+    if (state.cellCount !== undefined) currentCellCount = state.cellCount;
+    if (state.cellUrl !== undefined) currentCellUrl = state.cellUrl;
+    if (state.setCount !== undefined) currentSetCount = state.setCount;
+    if (state.setSelectionMode !== undefined) currentSetSelectionMode = state.setSelectionMode;
+    if (state.shape !== undefined) currentShape = state.shape;
+    if (state.radius !== undefined) currentRadius = state.radius;
+    if (state.cubeSize !== undefined) currentCubeSize = state.cubeSize;
+    if (state.planeWidth !== undefined) currentPlaneWidth = state.planeWidth;
+    if (state.planeHeight !== undefined) currentPlaneHeight = state.planeHeight;
+    if (state.modelUrl !== undefined) currentModelUrl = state.modelUrl;
+    if (state.scale !== undefined) currentScale = state.scale;
+    if (state.textureUrl !== undefined) currentEarthTextureUrl = state.textureUrl;
+    if (state.controlMode !== undefined) currentControlMode = state.controlMode;
+    if (state.tiltInvertX !== undefined) currentTiltInvertX = state.tiltInvertX;
+    if (state.tiltInvertY !== undefined) currentTiltInvertY = state.tiltInvertY;
+    if (state.tiltMaxAngle !== undefined) currentTiltMaxAngle = state.tiltMaxAngle;
+    if (state.tiltSmoothness !== undefined) currentTiltSmoothness = state.tiltSmoothness;
+    if (state.canvasWidth !== undefined) currentCanvasWidth = state.canvasWidth;
+    if (state.canvasHeight !== undefined) currentCanvasHeight = state.canvasHeight;
+    if (state.realTimeCodeGen !== undefined) realTimeCodeGen = state.realTimeCodeGen;
+    
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// 상태를 URL에 저장
+function saveStateToURL(): void {
+  const state = {
+    mosaicSize: currentMosaicSize,
+    noiseIntensity: currentNoiseIntensity,
+    noiseFPS: currentNoiseFPS,
+    cellCount: currentCellCount,
+    cellUrl: currentCellUrl,
+    setCount: currentSetCount,
+    setSelectionMode: currentSetSelectionMode,
+    shape: currentShape,
+    radius: currentRadius,
+    cubeSize: currentCubeSize,
+    planeWidth: currentPlaneWidth,
+    planeHeight: currentPlaneHeight,
+    modelUrl: currentModelUrl,
+    scale: currentScale,
+    textureUrl: currentEarthTextureUrl,
+    controlMode: currentControlMode,
+    tiltInvertX: currentTiltInvertX,
+    tiltInvertY: currentTiltInvertY,
+    tiltMaxAngle: currentTiltMaxAngle,
+    tiltSmoothness: currentTiltSmoothness,
+    canvasWidth: currentCanvasWidth,
+    canvasHeight: currentCanvasHeight,
+    realTimeCodeGen: realTimeCodeGen,
+  };
+  
+  const stateJson = encodeURIComponent(JSON.stringify(state));
+  const newUrl = new URL(window.location.href);
+  newUrl.searchParams.set('state', stateJson);
+  window.history.replaceState({}, '', newUrl.toString());
+}
 
 // 아코디언 초기화
 function initAccordion(): void {
@@ -85,9 +169,13 @@ initAccordion();
 const mosaic = new AscMosaic(canvasContainer);
 
 // 애니메이션 루프
+let lastCameraPosition = { x: 0, y: 0, z: 0 };
+let lastCameraRotation = { x: 0, y: 0, z: 0 };
+
 function animate() {
   requestAnimationFrame(animate);
   mosaic.renderOnce();
+  checkCameraUpdate();
 }
 
 // 리소스 목록 (resource_list.json에서 로드)
@@ -187,6 +275,7 @@ asciiToggleBtn.addEventListener('click', async () => {
       cellSelectContainer.style.display = 'flex';
       setConfigContainer.style.display = 'block';
       setCountValue.textContent = String(currentSetCount);
+      updateHTMLCodeIfRealtime();
     } else {
       asciiToggleBtn.textContent = 'ASCII 필터 토글';
       asciiToggleBtn.style.background = '#667eea';
@@ -197,6 +286,7 @@ asciiToggleBtn.addEventListener('click', async () => {
       cellSelectContainer.style.display = 'none';
       setConfigContainer.style.display = 'none';
     }
+    updateHTMLCodeIfRealtime();
   } catch (error) {
     console.error('ASCII 필터 토글 오류:', error);
   }
@@ -212,6 +302,7 @@ pixelSizeSlider.addEventListener('input', (e) => {
   if (mosaic.isAsciiMosaicFilterEnabled()) {
     mosaic.setMosaicSize(size);
   }
+  updateHTMLCodeIfRealtime();
 });
 
 // 노이즈 강도 슬라이더 이벤트
@@ -225,6 +316,7 @@ noiseIntensitySlider.addEventListener('input', (e) => {
   if (mosaic.isAsciiMosaicFilterEnabled()) {
     mosaic.setNoiseIntensity(intensity);
   }
+  updateHTMLCodeIfRealtime();
 });
 
 // 노이즈 FPS 슬라이더 이벤트
@@ -237,6 +329,7 @@ noiseFPSSlider.addEventListener('input', (e) => {
   if (mosaic.isAsciiMosaicFilterEnabled()) {
     mosaic.setNoiseFPS(fps);
   }
+  updateHTMLCodeIfRealtime();
 });
 
 // 셀 개수 슬라이더 이벤트
@@ -249,6 +342,7 @@ cellCountSlider.addEventListener('input', async (e) => {
     await mosaic.disableAsciiMosaicFilter();
     await mosaic.enableAsciiMosaicFilter(getMosaicFilterOptions());
   }
+  updateHTMLCodeIfRealtime();
 });
 
 // 세트 개수 슬라이더 이벤트
@@ -259,6 +353,7 @@ setCountSlider.addEventListener('input', (e) => {
   if (mosaic.isAsciiMosaicFilterEnabled()) {
     mosaic.setSetCount(count);
   }
+  updateHTMLCodeIfRealtime();
 });
 
 // 세트 선택 모드 이벤트
@@ -267,6 +362,7 @@ setSelectionModeSelect.addEventListener('change', () => {
   if (mosaic.isAsciiMosaicFilterEnabled()) {
     mosaic.setSetSelectionMode(currentSetSelectionMode);
   }
+  updateHTMLCodeIfRealtime();
 });
 
 // 셀 선택 이벤트
@@ -278,6 +374,7 @@ cellSelect.addEventListener('change', async () => {
     await mosaic.disableAsciiMosaicFilter();
     await mosaic.enableAsciiMosaicFilter(getMosaicFilterOptions());
   }
+  updateHTMLCodeIfRealtime();
 });
 
 // 도형 선택 이벤트
@@ -285,6 +382,7 @@ shapeSelect.addEventListener('change', async () => {
   currentShape = shapeSelect.value as ShapeType;
   showShapeParams(currentShape);
   await applyEarth();
+  updateHTMLCodeIfRealtime();
 });
 
 // 구 반지름
@@ -292,6 +390,7 @@ sphereRadiusSlider.addEventListener('input', async () => {
   currentRadius = parseFloat(sphereRadiusSlider.value);
   sphereRadiusValue.textContent = currentRadius.toFixed(1);
   await applyEarth();
+  updateHTMLCodeIfRealtime();
 });
 
 // 큐브 크기
@@ -299,6 +398,7 @@ cubeSizeSlider.addEventListener('input', async () => {
   currentCubeSize = parseFloat(cubeSizeSlider.value);
   cubeSizeValue.textContent = currentCubeSize.toFixed(1);
   await applyEarth();
+  updateHTMLCodeIfRealtime();
 });
 
 // 평면 가로/세로
@@ -306,11 +406,13 @@ planeWidthSlider.addEventListener('input', async () => {
   currentPlaneWidth = parseFloat(planeWidthSlider.value);
   planeWidthValue.textContent = currentPlaneWidth.toFixed(1);
   await applyEarth();
+  updateHTMLCodeIfRealtime();
 });
 planeHeightSlider.addEventListener('input', async () => {
   currentPlaneHeight = parseFloat(planeHeightSlider.value);
   planeHeightValue.textContent = currentPlaneHeight.toFixed(1);
   await applyEarth();
+  updateHTMLCodeIfRealtime();
 });
 
 // 크기(scale) 슬라이더
@@ -318,12 +420,14 @@ scaleSlider.addEventListener('input', async () => {
   currentScale = parseFloat(scaleSlider.value);
   scaleValue.textContent = currentScale.toFixed(1);
   await applyEarth();
+  updateHTMLCodeIfRealtime();
 });
 
 // GLB 모델 선택 이벤트
 modelSelect.addEventListener('change', async () => {
   currentModelUrl = modelSelect.value;
   await applyEarth();
+  updateHTMLCodeIfRealtime();
 });
 
 // 텍스처 선택 이벤트
@@ -332,6 +436,7 @@ textureSelect.addEventListener('change', async () => {
   if (!value) return;
   currentEarthTextureUrl = value;
   await applyEarth();
+  updateHTMLCodeIfRealtime();
 });
 
 // 컨트롤 모드 선택 이벤트
@@ -367,6 +472,7 @@ controlModeSelect.addEventListener('change', () => {
       orbitControls.dispose();
     }
   }
+  updateHTMLCodeIfRealtime();
 });
 
 // 기울임 반전 체크박스 이벤트
@@ -376,6 +482,7 @@ tiltInvertX.addEventListener('change', () => {
     const maxAngleRad = (currentTiltMaxAngle * Math.PI) / 180;
     mosaic.setupTiltControls(currentTiltInvertX, currentTiltInvertY, maxAngleRad, currentTiltSmoothness);
   }
+  updateHTMLCodeIfRealtime();
 });
 
 tiltInvertY.addEventListener('change', () => {
@@ -384,6 +491,7 @@ tiltInvertY.addEventListener('change', () => {
     const maxAngleRad = (currentTiltMaxAngle * Math.PI) / 180;
     mosaic.setupTiltControls(currentTiltInvertX, currentTiltInvertY, maxAngleRad, currentTiltSmoothness);
   }
+  updateHTMLCodeIfRealtime();
 });
 
 // 기울임 최대 각도 슬라이더 이벤트
@@ -394,6 +502,7 @@ tiltMaxAngleSlider.addEventListener('input', () => {
     const maxAngleRad = (currentTiltMaxAngle * Math.PI) / 180;
     mosaic.setupTiltControls(currentTiltInvertX, currentTiltInvertY, maxAngleRad, currentTiltSmoothness);
   }
+  updateHTMLCodeIfRealtime();
 });
 
 // 기울임 스무스 속도 슬라이더 이벤트
@@ -404,6 +513,7 @@ tiltSmoothnessSlider.addEventListener('input', () => {
     const maxAngleRad = (currentTiltMaxAngle * Math.PI) / 180;
     mosaic.setupTiltControls(currentTiltInvertX, currentTiltInvertY, maxAngleRad, currentTiltSmoothness);
   }
+  updateHTMLCodeIfRealtime();
 });
 
 // 조명 추가
@@ -444,16 +554,38 @@ function loadResourceList(): Promise<void> {
         opt.textContent = filename;
         modelSelect.appendChild(opt);
       });
-      if (list.cells?.length) currentCellUrl = base + list.cells[0];
-      if (list.textures?.length) currentEarthTextureUrl = base + list.textures[0];
-      if (list.models?.length) currentModelUrl = base + list.models[0];
-      showShapeParams(currentShape);
-      return applyEarth();
+      // URL에서 복원된 값이 없으면 기본값 사용
+      if (!hasStateFromURL) {
+        if (list.cells?.length) currentCellUrl = base + list.cells[0];
+        if (list.textures?.length) currentEarthTextureUrl = base + list.textures[0];
+        if (list.models?.length) currentModelUrl = base + list.models[0];
+      }
+      
+      // 리소스 로드 후 셀/텍스처/모델 선택 UI에 복원된 값 적용
+      if (hasStateFromURL) {
+        if (currentCellUrl && cellSelect.querySelector(`option[value="${currentCellUrl}"]`)) {
+          cellSelect.value = currentCellUrl;
+        }
+        if (currentEarthTextureUrl && textureSelect.querySelector(`option[value="${currentEarthTextureUrl}"]`)) {
+          textureSelect.value = currentEarthTextureUrl;
+        }
+        if (currentModelUrl && modelSelect.querySelector(`option[value="${currentModelUrl}"]`)) {
+          modelSelect.value = currentModelUrl;
+        }
+      }
+      
+      // URL에서 복원된 상태가 없을 때만 기본 적용
+      if (!hasStateFromURL) {
+        showShapeParams(currentShape);
+        await applyEarth();
+        updateHTMLCodeIfRealtime();
+      }
     })
     .catch(async (err) => {
       console.warn('resource_list.json 로드 실패, 기본값 사용:', err);
       showShapeParams(currentShape);
       await applyEarth();
+      updateHTMLCodeIfRealtime();
     });
 }
 
@@ -492,10 +624,48 @@ function generateHTMLCode(): string {
     tiltInvertY: currentTiltInvertY,
     tiltMaxAngle: currentTiltMaxAngle,
     tiltSmoothness: currentTiltSmoothness,
+    canvasWidth: currentCanvasWidth,
+    canvasHeight: currentCanvasHeight,
   };
   const configJson = JSON.stringify(config);
-  return `<div class="canvas-container ascmosaic" style="width:100%;height:500px;" data-ascmosaic-config='${configJson}'></div>
+  return `<!-- AscMosaic 캔버스 -->
+<div class="canvas-container ascmosaic" style="width:${currentCanvasWidth}px;height:${currentCanvasHeight}px;" data-ascmosaic-config='${configJson}'></div>
+
+<!-- 
+  여러 캔버스를 추가하는 경우:
+  - 위의 <div class="canvas-container ascmosaic"> 태그는 각 캔버스마다 추가하세요
+  - 아래의 <script> 태그는 페이지당 한 번만 추가하세요 (여러 캔버스가 있어도 스크립트는 한 번만 필요)
+-->
 <script type="module" src="./ascmosaic-app.js"></script>`;
+}
+
+function updateHTMLCode(): void {
+  const htmlCode = generateHTMLCode();
+  generatedHtmlCode.value = htmlCode;
+}
+
+function updateHTMLCodeIfRealtime(): void {
+  if (realTimeCodeGen) updateHTMLCode();
+  saveStateToURL();
+}
+
+function checkCameraUpdate(): void {
+  const camera = mosaic.getCamera();
+  const pos = camera.position;
+  const rot = camera.rotation;
+  if (
+    pos.x !== lastCameraPosition.x ||
+    pos.y !== lastCameraPosition.y ||
+    pos.z !== lastCameraPosition.z ||
+    rot.x !== lastCameraRotation.x ||
+    rot.y !== lastCameraRotation.y ||
+    rot.z !== lastCameraRotation.z
+  ) {
+    lastCameraPosition = { x: pos.x, y: pos.y, z: pos.z };
+    lastCameraRotation = { x: rot.x, y: rot.y, z: rot.z };
+    // 카메라 위치는 HTML 코드만 업데이트하고 URL은 업데이트하지 않음 (너무 자주 변경됨)
+    if (realTimeCodeGen) updateHTMLCode();
+  }
 }
 
 // 새 창 미리보기용: 스니펫을 최소 뼈대 HTML로 감싸고, 스크립트/텍스처는 현재 오리진으로 로드
@@ -525,12 +695,33 @@ ${baseUrlScript}${bodyContent}
 </html>`;
 }
 
-// HTML 코드 생성 버튼 이벤트
+// 실시간 코드 생성 토글
+realTimeCodeToggle.addEventListener('change', () => {
+  realTimeCodeGen = realTimeCodeToggle.checked;
+  generateHtmlBtn.style.display = realTimeCodeGen ? 'none' : 'inline-block';
+  if (realTimeCodeGen) updateHTMLCode();
+  saveStateToURL();
+});
+
+// HTML 코드 생성 버튼 (실시간 꺼져 있을 때만 표시)
 generateHtmlBtn.addEventListener('click', () => {
-  const htmlCode = generateHTMLCode();
-  generatedHtmlCode.value = htmlCode;
-  previewHtmlBtn.style.display = 'block';
+  updateHTMLCode();
   generatedHtmlCode.select();
+});
+
+// 코드 복사 버튼
+copyCodeBtn.addEventListener('click', async () => {
+  const text = generatedHtmlCode.value;
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    const prev = copyCodeBtn.textContent;
+    copyCodeBtn.textContent = '복사됨';
+    setTimeout(() => { copyCodeBtn.textContent = prev; }, 1500);
+  } catch {
+    generatedHtmlCode.select();
+    document.execCommand('copy');
+  }
 });
 
 // 새 창에서 확인 버튼 이벤트 (스니펫을 뼈대 HTML로 감싸고, 스크립트는 현재 오리진으로 로드)
@@ -545,9 +736,134 @@ previewHtmlBtn.addEventListener('click', () => {
   }
 });
 
-// 초기 슬라이더 값 표시 업데이트
-tiltMaxAngleValue.textContent = currentTiltMaxAngle.toString();
-tiltSmoothnessValue.textContent = currentTiltSmoothness.toFixed(2);
+// 캔버스 크기 변경 함수
+function updateCanvasSize(width: number, height: number): void {
+  currentCanvasWidth = width;
+  currentCanvasHeight = height;
+  canvasContainer.style.width = `${width}px`;
+  canvasContainer.style.height = `${height}px`;
+  mosaic.setCanvasSize(width, height);
+  updateHTMLCodeIfRealtime();
+}
 
-// 리소스 로드 후 애니메이션 시작
-loadResourceList().then(() => animate());
+// 캔버스 너비 슬라이더 이벤트
+canvasWidthSlider.addEventListener('input', () => {
+  const width = parseInt(canvasWidthSlider.value);
+  currentCanvasWidth = width;
+  canvasWidthValue.textContent = width.toString();
+  updateCanvasSize(width, currentCanvasHeight);
+});
+
+// 캔버스 높이 슬라이더 이벤트
+canvasHeightSlider.addEventListener('input', () => {
+  const height = parseInt(canvasHeightSlider.value);
+  currentCanvasHeight = height;
+  canvasHeightValue.textContent = height.toString();
+  updateCanvasSize(currentCanvasWidth, height);
+});
+
+// URL에서 상태 복원 (페이지 로드 시)
+const hasStateFromURL = loadStateFromURL();
+
+// UI 요소에 복원된 상태 적용
+function applyStateToUI(): void {
+  pixelSizeSlider.value = currentMosaicSize.toString();
+  pixelSizeValue.textContent = currentMosaicSize.toString();
+  noiseIntensitySlider.value = (currentNoiseIntensity * 100).toString();
+  noiseIntensityValue.textContent = currentNoiseIntensity.toFixed(2);
+  noiseFPSSlider.value = currentNoiseFPS.toString();
+  noiseFPSValue.textContent = currentNoiseFPS.toString();
+  cellCountSlider.value = currentCellCount.toString();
+  cellCountValue.textContent = currentCellCount.toString();
+  setCountSlider.value = currentSetCount.toString();
+  setCountValue.textContent = currentSetCount.toString();
+  setSelectionModeSelect.value = currentSetSelectionMode;
+  shapeSelect.value = currentShape;
+  sphereRadiusSlider.value = currentRadius.toString();
+  sphereRadiusValue.textContent = currentRadius.toFixed(1);
+  cubeSizeSlider.value = currentCubeSize.toString();
+  cubeSizeValue.textContent = currentCubeSize.toFixed(1);
+  planeWidthSlider.value = currentPlaneWidth.toString();
+  planeWidthValue.textContent = currentPlaneWidth.toFixed(1);
+  planeHeightSlider.value = currentPlaneHeight.toString();
+  planeHeightValue.textContent = currentPlaneHeight.toFixed(1);
+  scaleSlider.value = currentScale.toString();
+  scaleValue.textContent = currentScale.toFixed(1);
+  textureSelect.value = currentEarthTextureUrl;
+  controlModeSelect.value = currentControlMode;
+  tiltInvertX.checked = currentTiltInvertX;
+  tiltInvertY.checked = currentTiltInvertY;
+  tiltMaxAngleSlider.value = currentTiltMaxAngle.toString();
+  tiltMaxAngleValue.textContent = currentTiltMaxAngle.toString();
+  tiltSmoothnessSlider.value = currentTiltSmoothness.toString();
+  tiltSmoothnessValue.textContent = currentTiltSmoothness.toFixed(2);
+  canvasWidthSlider.value = currentCanvasWidth.toString();
+  canvasWidthValue.textContent = currentCanvasWidth.toString();
+  canvasHeightSlider.value = currentCanvasHeight.toString();
+  canvasHeightValue.textContent = currentCanvasHeight.toString();
+  realTimeCodeToggle.checked = realTimeCodeGen;
+  generateHtmlBtn.style.display = realTimeCodeGen ? 'none' : 'inline-block';
+}
+
+// 초기 슬라이더 값 표시 업데이트
+applyStateToUI();
+
+// 초기 캔버스 크기 설정
+updateCanvasSize(currentCanvasWidth, currentCanvasHeight);
+
+// 리소스 로드 후 애니메이션 시작 및 상태 적용
+loadResourceList().then(async () => {
+  // URL에서 복원된 상태가 있으면 적용
+  if (hasStateFromURL) {
+    showShapeParams(currentShape);
+    await applyEarth();
+    
+    // 컨트롤 모드 적용
+    if (currentControlMode === 'orbit') {
+      mosaic.disableTiltControls();
+      mosaic.setupOrbitControls({
+        minDistance: 3,
+        maxDistance: 10,
+        rotateSpeed: 1.0,
+        zoomSpeed: 0.1,
+      });
+    } else if (currentControlMode === 'tilt') {
+      const maxAngleRad = (currentTiltMaxAngle * Math.PI) / 180;
+      mosaic.setupTiltControls(currentTiltInvertX, currentTiltInvertY, maxAngleRad, currentTiltSmoothness);
+      tiltInvertContainer.style.display = 'flex';
+      tiltSettingsContainer.style.display = 'block';
+    } else {
+      mosaic.disableTiltControls();
+      const orbitControls = mosaic.getOrbitControls();
+      if (orbitControls) {
+        orbitControls.dispose();
+      }
+    }
+    
+    // ASCII 필터 상태 복원
+    if (currentMosaicSize || currentCellUrl) {
+      await mosaic.enableAsciiMosaicFilter(getMosaicFilterOptions());
+      asciiToggleBtn.textContent = 'ASCII 필터 끄기';
+      asciiToggleBtn.style.background = '#28a745';
+      pixelSizeContainer.style.display = 'flex';
+      noiseIntensityContainer.style.display = 'flex';
+      noiseFPSContainer.style.display = 'flex';
+      cellCountContainer.style.display = 'flex';
+      cellSelectContainer.style.display = 'flex';
+      setConfigContainer.style.display = 'block';
+    }
+    
+    updateHTMLCodeIfRealtime();
+  }
+  
+  animate();
+}).catch(async (err) => {
+  console.warn('리소스 로드 실패:', err);
+  // 에러 발생 시에도 기본 상태로 시작
+  if (!hasStateFromURL) {
+    showShapeParams(currentShape);
+    await applyEarth();
+    updateHTMLCodeIfRealtime();
+  }
+  animate();
+});

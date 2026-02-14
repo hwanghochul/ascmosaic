@@ -512,6 +512,18 @@ export class AscMosaic {
   }
 
   /**
+   * 캔버스 크기 설정
+   */
+  setCanvasSize(width: number, height: number): void {
+    this.camera.aspect = width / height;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(width, height);
+    if (this.asciiMosaicFilter) {
+      this.asciiMosaicFilter.setSize(width, height);
+    }
+  }
+
+  /**
    * OrbitControls 가져오기
    */
   getOrbitControls(): OrbitControls | null {

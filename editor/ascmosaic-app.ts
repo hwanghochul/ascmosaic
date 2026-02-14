@@ -31,6 +31,8 @@ declare global {
       tiltInvertY?: boolean;
       tiltMaxAngle?: number;
       tiltSmoothness?: number;
+      canvasWidth?: number;
+      canvasHeight?: number;
     };
     /** Blob 미리보기 등에서 텍스처를 같은 오리진으로 로드할 때 사용 (예: 'https://localhost:5173') */
     ASC_MOSAIC_BASE_URL?: string;
@@ -68,6 +70,8 @@ interface InstanceConfig {
   tiltInvertY?: boolean;
   tiltMaxAngle?: number;
   tiltSmoothness?: number;
+  canvasWidth?: number;
+  canvasHeight?: number;
 }
 
 async function initContainer(container: HTMLElement): Promise<AscMosaic | null> {
@@ -86,6 +90,15 @@ async function initContainer(container: HTMLElement): Promise<AscMosaic | null> 
 
   const mosaic = new AscMosaic(container);
   mosaic.addLights();
+
+  // 캔버스 크기 설정 (config에 있으면 적용)
+  const canvasWidth = config.canvasWidth ?? container.clientWidth;
+  const canvasHeight = config.canvasHeight ?? container.clientHeight;
+  if (config.canvasWidth || config.canvasHeight) {
+    container.style.width = `${canvasWidth}px`;
+    container.style.height = `${canvasHeight}px`;
+    mosaic.setCanvasSize(canvasWidth, canvasHeight);
+  }
 
   const shape = config.shape ?? 'sphere';
   const scale = config.scale ?? 1;

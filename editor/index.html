@@ -224,15 +224,18 @@
       grid-row: 1;
       display: flex;
       flex-direction: column;
+      justify-content: center;
+      align-items: center;
       min-height: 0;
-      background: #fff;
+      background: #e8e8e8;
+      padding: 20px;
     }
 
     #canvas-container {
-      flex: 1;
-      min-height: 0;
-      background: #f5f5f5;
+      background: #fff;
+      border: 1px solid #d0d0d0;
       cursor: grab;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
     }
 
     #canvas-container:active {
@@ -254,18 +257,58 @@
     .html-panel-header {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 8px 16px;
-      background: #f5f5f5;
-      border-bottom: 1px solid #e0e0e0;
+      gap: 12px;
+      padding: 8px 12px;
+      background: #f8f9fa;
+      border-bottom: 1px solid #e9ecef;
       flex-shrink: 0;
     }
 
-    .html-panel-header .btn-block {
-      width: auto;
-      padding: 6px 14px;
-      font-size: 13px;
-      margin-bottom: 0;
+    .html-panel-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #495057;
+      margin-right: 8px;
+    }
+
+    .html-panel-header label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #495057;
+      cursor: pointer;
+      margin: 0;
+    }
+
+    .html-panel-header input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      cursor: pointer;
+    }
+
+    .html-panel-header .btn-panel {
+      padding: 4px 10px;
+      font-size: 12px;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      background: #fff;
+      color: #495057;
+      cursor: pointer;
+    }
+
+    .html-panel-header .btn-panel:hover {
+      background: #e9ecef;
+    }
+
+    .html-panel-header .btn-panel.primary {
+      background: #667eea;
+      color: #fff;
+      border-color: #667eea;
+    }
+
+    .html-panel-header .btn-panel.primary:hover {
+      background: #5a6fd6;
     }
 
     #generated-html-code {
@@ -399,7 +442,27 @@
       </div>
     </div>
 
-    <!-- 3. 컨트롤 설정 -->
+    <!-- 3. 콘텐츠 크기 -->
+    <div class="accordion-section" data-accordion="canvas-size">
+      <div class="accordion-header">
+        <span>콘텐츠 크기</span>
+        <span class="accordion-icon">▼</span>
+      </div>
+      <div class="accordion-content">
+        <div class="control-row">
+          <label for="canvas-width-slider">너비 (px)</label>
+          <input type="range" id="canvas-width-slider" min="200" max="2000" value="800" step="10">
+          <span class="slider-value" id="canvas-width-value">800</span>
+        </div>
+        <div class="control-row">
+          <label for="canvas-height-slider">높이 (px)</label>
+          <input type="range" id="canvas-height-slider" min="200" max="2000" value="600" step="10">
+          <span class="slider-value" id="canvas-height-value">600</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. 컨트롤 설정 -->
     <div class="accordion-section" data-accordion="control">
       <div class="accordion-header">
         <span>컨트롤 설정</span>
@@ -433,17 +496,6 @@
       </div>
     </div>
 
-    <!-- 4. 코드 생성 -->
-    <div class="accordion-section" data-accordion="code">
-      <div class="accordion-header">
-        <span>코드 생성</span>
-        <span class="accordion-icon">▼</span>
-      </div>
-      <div class="accordion-content">
-        <button type="button" id="generate-html-btn" class="btn-block">HTML 코드 생성</button>
-        <button type="button" id="preview-html-btn" class="btn-block secondary" style="display: none;">새 창에서 확인</button>
-      </div>
-    </div>
   </aside>
 
   <!-- 오른쪽: 콘텐츠 + 하단 HTML -->
@@ -453,9 +505,15 @@
 
   <section class="html-panel">
     <div class="html-panel-header">
-      <span style="font-size: 13px; font-weight: 600; color: #333;">HTML 코드</span>
+      <span class="html-panel-title">HTML 코드</span>
+      <label>
+        <input type="checkbox" id="realtime-code-toggle" checked> 실시간
+      </label>
+      <button type="button" id="generate-html-btn" class="btn-panel primary" style="display: none;">생성</button>
+      <button type="button" id="copy-code-btn" class="btn-panel">복사</button>
+      <button type="button" id="preview-html-btn" class="btn-panel">새 창에서 미리보기</button>
     </div>
-    <textarea id="generated-html-code" readonly placeholder="HTML 코드 생성 버튼을 누르면 생성된 코드가 여기에 표시됩니다."></textarea>
+    <textarea id="generated-html-code" readonly placeholder="실시간이 켜져 있으면 자동으로, 꺼져 있으면 생성 버튼을 누르면 코드가 표시됩니다."></textarea>
   </section>
 
   <script type="module" src="/main.ts"></script>
