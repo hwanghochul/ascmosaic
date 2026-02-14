@@ -14,8 +14,8 @@ export class AscMosaic {
   private camera: THREE.PerspectiveCamera;
   private renderer: THREE.WebGLRenderer;
   private cube: THREE.Mesh | null = null;
-  private earth: THREE.Object3D | null = null;
-  private earthOptions: TexturedMeshOptions | null = null;
+  private model: THREE.Object3D | null = null;
+  private modelOptions: TexturedMeshOptions | null = null;
   private orbitControls: OrbitControls | null = null;
   private asciiMosaicFilter: AsciiMosaicFilter | null = null;
   private animationFrameId: number | null = null;
@@ -42,6 +42,9 @@ export class AscMosaic {
       alpha: true, // 알파 채널 지원
     });
     this.renderer.setSize(container.clientWidth, container.clientHeight);
+    // 색상이 정확하게 보이도록 tone mapping 설정
+    this.renderer.toneMapping = THREE.LinearToneMapping;
+    this.renderer.toneMappingExposure = 2.0;
     container.appendChild(this.renderer.domElement);
 
     // 리사이즈 핸들러
@@ -57,62 +60,49 @@ export class AscMosaic {
     });
   }
 
-  /**
-   * 큐브를 추가합니다
-   */
-  addCube(): void {
-    const geometry = new THREE.BoxGeometry(1, 1, 1);
-    const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-    this.cube = new THREE.Mesh(geometry, material);
-    this.scene.add(this.cube);
-  }
-
-  /**
-   * 지구본(텍스처 메시 또는 GLB)을 추가합니다 (구/큐브/평면/glb 선택 가능)
-   */
-  async addEarth(options?: TexturedMeshOptions): Promise<THREE.Object3D> {
+  async addModel(options?: TexturedMeshOptions): Promise<THREE.Object3D> {
     const opts = options ?? {};
     const newShape = opts.shape ?? 'sphere';
     const newScale = opts.scale ?? 1;
 
     // 기존 모델이 있고 같은 shape이고 scale만 변경된 경우: scale만 업데이트
-    if (this.earth && this.earthOptions && this.earthOptions.shape === newShape) {
-      const oldScale = this.earthOptions.scale ?? 1;
+    if (this.model && this.modelOptions && this.modelOptions.shape === newShape) {
+      const oldScale = this.modelOptions.scale ?? 1;
       const optionsChanged = 
-        this.earthOptions.radius !== opts.radius ||
-        this.earthOptions.size !== opts.size ||
-        this.earthOptions.width !== opts.width ||
-        this.earthOptions.height !== opts.height ||
-        this.earthOptions.textureUrl !== opts.textureUrl ||
-        this.earthOptions.modelUrl !== opts.modelUrl;
+        this.modelOptions.radius !== opts.radius ||
+        this.modelOptions.size !== opts.size ||
+        this.modelOptions.width !== opts.width ||
+        this.modelOptions.height !== opts.height ||
+        this.modelOptions.textureUrl !== opts.textureUrl ||
+        this.modelOptions.modelUrl !== opts.modelUrl;
 
       if (!optionsChanged && oldScale !== newScale) {
         // scale만 변경: 기존 메시의 scale만 업데이트
-        this.earth.scale.setScalar(newScale);
-        this.earthOptions = { ...opts };
-        return this.earth;
+        this.model.scale.setScalar(newScale);
+        this.modelOptions = { ...opts };
+        return this.model;
       }
     }
 
     // shape가 변경되었거나 다른 옵션이 변경된 경우: 새로 생성
-    if (this.earth) {
-      this.scene.remove(this.earth);
-      this.earth.traverse((obj) => {
+    if (this.model) {
+      this.scene.remove(this.model);
+      this.model.traverse((obj) => {
         if (obj instanceof THREE.Mesh) {
           obj.geometry?.dispose();
           if (obj.material instanceof THREE.Material) obj.material.dispose();
         }
       });
-      this.earth = null;
+      this.model = null;
     }
 
-    this.earth = await createTexturedMesh(opts);
-    this.scene.add(this.earth);
-    this.earthOptions = { ...opts };
+    this.model = await createTexturedMesh(opts);
+    this.scene.add(this.model);
+    this.modelOptions = { ...opts };
 
     // GLB 모델의 경우 bounding box를 계산하여 카메라 위치 조정
-    if (opts.shape === 'glb' && this.earth) {
-      const box = new THREE.Box3().setFromObject(this.earth);
+    if (opts.shape === 'glb' && this.model) {
+      const box = new THREE.Box3().setFromObject(this.model);
       if (!box.isEmpty()) {
         const size = box.getSize(new THREE.Vector3());
         const center = box.getCenter(new THREE.Vector3());
@@ -120,19 +110,10 @@ export class AscMosaic {
         // 모델이 작으면 최소 거리 보장, 크면 모델 크기의 3배 거리
         const distance = Math.max(maxDim * 3, 5);
         
-        console.log('GLB bounding box:', {
-          size: { x: size.x.toFixed(3), y: size.y.toFixed(3), z: size.z.toFixed(3) },
-          center: { x: center.x.toFixed(3), y: center.y.toFixed(3), z: center.z.toFixed(3) },
-          maxDim: maxDim.toFixed(3),
-          distance: distance.toFixed(3),
-          scale: opts.scale ?? 1
-        });
-        
         this.camera.position.set(center.x, center.y, center.z + distance);
         this.camera.lookAt(center);
         this.camera.updateProjectionMatrix();
       } else {
-        console.warn('GLB bounding box가 비어있음');
         this.camera.position.set(0, 0, 5);
         this.camera.lookAt(0, 0, 0);
       }
@@ -141,7 +122,7 @@ export class AscMosaic {
       this.camera.lookAt(0, 0, 0);
     }
 
-    return this.earth;
+    return this.model;
   }
 
   /**
@@ -164,17 +145,13 @@ export class AscMosaic {
   }
 
   /**
-   * 조명을 추가합니다
+   * 조명을 추가합니다 (모델의 고유색이 잘 보이도록 Ambient Light만 사용)
    */
   addLights(): void {
-    // Ambient Light (전체 조명)
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    // Ambient Light만 사용하여 모델의 고유색이 균일하게 보이도록 설정
+    // intensity를 높여서 색상이 밝게 보이도록 함
+    const ambientLight = new THREE.AmbientLight(0xffffff, 3.0);
     this.scene.add(ambientLight);
-
-    // Directional Light (태양광)
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(5, 5, 5);
-    this.scene.add(directionalLight);
   }
 
   /**
@@ -208,9 +185,9 @@ export class AscMosaic {
         this.cube.rotation.y += 0.01;
       }
 
-      // 지구본 자동 회전
-      if (this.earth) {
-        this.earth.rotation.y += 0.005; // Y축 기준 회전 (지구 자전)
+      // 모델 자동 회전
+      if (this.model) {
+        this.model.rotation.y += 0.005; // Y축 기준 회전
       }
 
       // OrbitControls 업데이트
@@ -368,8 +345,8 @@ export class AscMosaic {
       }
     }
 
-    if (this.earth) {
-      this.earth.traverse((obj) => {
+    if (this.model) {
+      this.model.traverse((obj) => {
         if (obj instanceof THREE.Mesh) {
           obj.geometry?.dispose();
           if (obj.material instanceof THREE.Material) obj.material.dispose();

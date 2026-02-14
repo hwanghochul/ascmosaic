@@ -67,8 +67,7 @@ async function initContainer(container: HTMLElement): Promise<AscMosaic | null> 
   if (!raw && window.ASC_MOSAIC_CONFIG) config = window.ASC_MOSAIC_CONFIG;
 
   const mosaic = new AscMosaic(container);
-  // 조명 추가 제거
-  // mosaic.addLights();
+  mosaic.addLights();
 
   const shape = config.shape ?? 'sphere';
   const scale = config.scale ?? 1;
@@ -88,7 +87,7 @@ async function initContainer(container: HTMLElement): Promise<AscMosaic | null> 
       earthOptions.height = config.height ?? 4;
     }
   }
-  await mosaic.addEarth(earthOptions);
+  await mosaic.addModel(earthOptions);
 
   mosaic.setupOrbitControls({
     minDistance: 3,

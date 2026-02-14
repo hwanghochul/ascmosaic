@@ -56,55 +56,8 @@ function loadGlbModel(url: string): Promise<THREE.Group> {
     loader.load(
       url,
       (gltf) => {
-        console.log('GLB 로드 성공:', gltf);
-        console.log('Scene children:', gltf.scene.children.length);
-        console.log('Scene type:', gltf.scene.type);
-        
         const group = new THREE.Group();
         group.add(gltf.scene);
-        
-        // 모든 메시의 material을 MeshStandardMaterial로 변경하여 조명 효과 적용
-        let meshCount = 0;
-        let totalObjects = 0;
-        gltf.scene.traverse((obj) => {
-          totalObjects++;
-          if (obj instanceof THREE.Mesh) {
-            meshCount++;
-            console.log('Mesh found:', obj.name || 'unnamed', 'material:', obj.material ? 'yes' : 'no');
-            
-            if (obj.material) {
-              const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
-              const newMaterials = materials.map((oldMaterial) => {
-                const materialParams: THREE.MeshStandardMaterialParameters = {
-                  color: 0xffffff,
-                  roughness: 0.7,
-                  metalness: 0.1,
-                };
-                
-                if (oldMaterial instanceof THREE.Material) {
-                  // 모든 Material 타입에서 map과 color 추출 시도
-                  if ('map' in oldMaterial && oldMaterial.map) {
-                    materialParams.map = oldMaterial.map as THREE.Texture;
-                  }
-                  if ('color' in oldMaterial && oldMaterial.color) {
-                    materialParams.color = (oldMaterial.color as THREE.Color).getHex();
-                  }
-                }
-                
-                return new THREE.MeshStandardMaterial(materialParams);
-              });
-              obj.material = Array.isArray(obj.material) ? newMaterials : newMaterials[0];
-            } else {
-              // material이 없으면 기본 material 추가
-              obj.material = new THREE.MeshStandardMaterial({ color: 0xffffff });
-            }
-          }
-        });
-        
-        console.log('Total objects traversed:', totalObjects, 'Meshes:', meshCount);
-        
-        // 메시 개수 저장 (디버깅용)
-        (group as any)._meshCount = meshCount;
         resolve(group);
       },
       undefined,
@@ -134,22 +87,8 @@ export function createTexturedMesh(options: TexturedMeshOptions = {}): Promise<T
     return loadGlbModel(modelUrl).then((group) => {
       group.scale.setScalar(scale);
       group.name = 'TexturedMesh';
-      
-      // bounding box 계산하여 모델이 보이도록 확인
-      const box = new THREE.Box3().setFromObject(group);
-      const size = box.getSize(new THREE.Vector3());
-      const center = box.getCenter(new THREE.Vector3());
-      const meshCount = (group as any)._meshCount || 0;
-      console.log('GLB 모델 로드 완료:', {
-        size: { x: size.x.toFixed(2), y: size.y.toFixed(2), z: size.z.toFixed(2) },
-        center: { x: center.x.toFixed(2), y: center.y.toFixed(2), z: center.z.toFixed(2) },
-        children: group.children.length,
-        meshes: meshCount
-      });
-      
       return group;
-    }).catch((error) => {
-      console.error('GLB 모델 로드 실패:', error, 'URL:', modelUrl);
+    }).catch(() => {
       // 폴백: 기본 메시 반환
       const fallback = new THREE.Mesh(
         new THREE.SphereGeometry(1, 16, 16),
@@ -183,7 +122,7 @@ export function createTexturedMesh(options: TexturedMeshOptions = {}): Promise<T
   }
 
   const materialOptions: THREE.MeshBasicMaterialParameters = {
-    color: 0xdddddd,
+    color: 0xffffff,
   };
   if (texture && !textureLoadFailed) {
     materialOptions.map = texture;

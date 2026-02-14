@@ -96,7 +96,7 @@ function getEarthOptions() {
 }
 
 async function applyEarth() {
-  await mosaic.addEarth(getEarthOptions());
+  await mosaic.addModel(getEarthOptions());
 }
 
 function showShapeParams(shape: ShapeType) {
@@ -273,8 +273,8 @@ textureSelect.addEventListener('change', async () => {
   await applyEarth();
 });
 
-// 조명 추가 제거
-// mosaic.addLights();
+// 조명 추가
+mosaic.addLights();
 
 // OrbitControls 설정 (마우스로 지구본 회전 및 줌)
 mosaic.setupOrbitControls({
