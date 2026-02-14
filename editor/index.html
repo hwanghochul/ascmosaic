@@ -68,6 +68,31 @@
       margin-bottom: 10px;
     }
 
+    .set-config-container {
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .set-config-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .set-config-row label {
+      font-weight: 500;
+      color: #333;
+      min-width: 120px;
+    }
+
+    .set-config-row input[type="range"] {
+      flex: 1;
+    }
+
+    .set-config-row .combo-select {
+      flex: 1;
+    }
+
     .cell-select-container,
     .texture-select-container,
     .shape-select-container,
@@ -361,6 +386,22 @@
       <label for="cell-count-slider">셀 개수:</label>
       <input type="range" id="cell-count-slider" min="2" max="20" value="6" step="1">
       <span class="slider-value" id="cell-count-value">6</span>
+    </div>
+
+    <div class="slider-container set-config-container" id="set-config-container" style="display: none;">
+      <div class="set-config-row">
+        <label for="set-count-slider">세트(행) 개수:</label>
+        <input type="range" id="set-count-slider" min="1" max="10" value="1" step="1">
+        <span class="slider-value" id="set-count-value">1</span>
+      </div>
+      <div class="set-config-row">
+        <label for="set-selection-mode-select">세트 선택:</label>
+        <select id="set-selection-mode-select" class="combo-select">
+          <option value="first">첫번째만</option>
+          <option value="random">랜덤</option>
+          <option value="cycle">순회</option>
+        </select>
+      </div>
     </div>
 
     <div class="cell-select-container" id="cell-select-container" style="display: none;">

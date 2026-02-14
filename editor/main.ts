@@ -44,6 +44,10 @@ const tiltSmoothnessValue = document.getElementById('tilt-smoothness-value')!;
 const cellCountContainer = document.getElementById('cell-count-container')!;
 const cellCountSlider = document.getElementById('cell-count-slider')! as HTMLInputElement;
 const cellCountValue = document.getElementById('cell-count-value')!;
+const setConfigContainer = document.getElementById('set-config-container')!;
+const setCountSlider = document.getElementById('set-count-slider')! as HTMLInputElement;
+const setCountValue = document.getElementById('set-count-value')!;
+const setSelectionModeSelect = document.getElementById('set-selection-mode-select')! as HTMLSelectElement;
 const generateHtmlBtn = document.getElementById('generate-html-btn')!;
 const previewHtmlBtn = document.getElementById('preview-html-btn')!;
 const generatedHtmlCode = document.getElementById('generated-html-code')! as HTMLTextAreaElement;
@@ -85,6 +89,21 @@ let currentTiltInvertX = false;
 let currentTiltInvertY = false;
 let currentTiltMaxAngle = 30; // 도 단위
 let currentTiltSmoothness = 0.15;
+let currentSetCount = 1;
+let currentSetSelectionMode: 'first' | 'random' | 'cycle' = 'first';
+
+function getMosaicFilterOptions() {
+  return {
+    mosaicSize: currentMosaicSize,
+    mosaicCellTextureUrl: currentCellUrl,
+    cellCount: currentCellCount,
+    backgroundColor: 0xffffff,
+    noiseIntensity: currentNoiseIntensity,
+    noiseFPS: currentNoiseFPS,
+    setCount: currentSetCount,
+    setSelectionMode: currentSetSelectionMode,
+  };
+}
 
 function getEarthOptions() {
   const base: Record<string, unknown> = {
@@ -127,14 +146,7 @@ showShapeParams(currentShape);
 // ASCII 필터 토글 버튼
 asciiToggleBtn.addEventListener('click', async () => {
   try {
-    await mosaic.toggleAsciiMosaicFilter({
-      mosaicSize: currentMosaicSize,
-      mosaicCellTextureUrl: currentCellUrl,
-      cellCount: currentCellCount,
-      backgroundColor: 0xffffff,
-      noiseIntensity: currentNoiseIntensity,
-      noiseFPS: currentNoiseFPS,
-    });
+    await mosaic.toggleAsciiMosaicFilter(getMosaicFilterOptions());
 
     if (mosaic.isAsciiMosaicFilterEnabled()) {
       asciiToggleBtn.textContent = 'ASCII 필터 끄기';
@@ -144,6 +156,8 @@ asciiToggleBtn.addEventListener('click', async () => {
       noiseFPSContainer.style.display = 'flex';
       cellCountContainer.style.display = 'flex';
       cellSelectContainer.style.display = 'flex';
+      setConfigContainer.style.display = 'flex';
+      setCountValue.textContent = String(currentSetCount);
     } else {
       asciiToggleBtn.textContent = 'ASCII 필터 토글';
       asciiToggleBtn.style.background = '#667eea';
@@ -152,6 +166,7 @@ asciiToggleBtn.addEventListener('click', async () => {
       noiseFPSContainer.style.display = 'none';
       cellCountContainer.style.display = 'none';
       cellSelectContainer.style.display = 'none';
+      setConfigContainer.style.display = 'none';
     }
   } catch (error) {
     console.error('ASCII 필터 토글 오류:', error);
@@ -201,17 +216,27 @@ cellCountSlider.addEventListener('input', async (e) => {
   currentCellCount = count;
   cellCountValue.textContent = count.toString();
 
-  // 셀 개수는 런타임 변경이 불가하므로 필터를 재생성
   if (mosaic.isAsciiMosaicFilterEnabled()) {
     await mosaic.disableAsciiMosaicFilter();
-    await mosaic.enableAsciiMosaicFilter({
-      mosaicSize: currentMosaicSize,
-      mosaicCellTextureUrl: currentCellUrl,
-      cellCount: currentCellCount,
-      backgroundColor: 0xffffff,
-      noiseIntensity: currentNoiseIntensity,
-      noiseFPS: currentNoiseFPS,
-    });
+    await mosaic.enableAsciiMosaicFilter(getMosaicFilterOptions());
+  }
+});
+
+// 세트 개수 슬라이더 이벤트
+setCountSlider.addEventListener('input', (e) => {
+  const count = parseInt((e.target as HTMLInputElement).value);
+  currentSetCount = count;
+  setCountValue.textContent = count.toString();
+  if (mosaic.isAsciiMosaicFilterEnabled()) {
+    mosaic.setSetCount(count);
+  }
+});
+
+// 세트 선택 모드 이벤트
+setSelectionModeSelect.addEventListener('change', () => {
+  currentSetSelectionMode = setSelectionModeSelect.value as 'first' | 'random' | 'cycle';
+  if (mosaic.isAsciiMosaicFilterEnabled()) {
+    mosaic.setSetSelectionMode(currentSetSelectionMode);
   }
 });
 
@@ -222,14 +247,7 @@ cellSelect.addEventListener('change', async () => {
   currentCellUrl = value;
   if (mosaic.isAsciiMosaicFilterEnabled()) {
     await mosaic.disableAsciiMosaicFilter();
-    await mosaic.enableAsciiMosaicFilter({
-      mosaicSize: currentMosaicSize,
-      mosaicCellTextureUrl: currentCellUrl,
-      cellCount: currentCellCount,
-      backgroundColor: 0xffffff,
-      noiseIntensity: currentNoiseIntensity,
-      noiseFPS: currentNoiseFPS,
-    });
+    await mosaic.enableAsciiMosaicFilter(getMosaicFilterOptions());
   }
 });
 
@@ -425,6 +443,8 @@ function generateHTMLCode(): string {
     mosaicCellTextureUrl: currentCellUrl,
     textureUrl: currentEarthTextureUrl,
     cellCount: currentCellCount,
+    setCount: currentSetCount,
+    setSelectionMode: currentSetSelectionMode,
     backgroundColor: 0xffffff,
     noiseIntensity: currentNoiseIntensity,
     noiseFPS: currentNoiseFPS,

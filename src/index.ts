@@ -473,6 +473,24 @@ export class AscMosaic {
   }
 
   /**
+   * 모자이크 세트 개수를 설정합니다
+   */
+  setSetCount(setCount: number): void {
+    if (this.asciiMosaicFilter) {
+      this.asciiMosaicFilter.setSetCount(setCount);
+    }
+  }
+
+  /**
+   * 모자이크 세트 선택 모드를 설정합니다
+   */
+  setSetSelectionMode(mode: 'first' | 'random' | 'cycle'): void {
+    if (this.asciiMosaicFilter) {
+      this.asciiMosaicFilter.setSetSelectionMode(mode);
+    }
+  }
+
+  /**
    * Scene 가져오기
    */
   getScene(): THREE.Scene {

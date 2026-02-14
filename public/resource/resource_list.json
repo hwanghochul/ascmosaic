@@ -1,5 +1,5 @@
 {
-  "cells": ["mosaic_cell.png", "mosaic_cell2.png"],
+  "cells": ["mosaic_cell.png", "mosaic_cell2.png", "mosaic_cell_6x6.png"],
   "textures": ["earth.jpg", "test.jpg"],
-  "models": ["ball.glb", "house.glb", "box.glb"]
+  "models": ["ball.glb", "house.glb"]
 }

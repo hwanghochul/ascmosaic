@@ -26,6 +26,10 @@ export interface AsciiMosaicFilterOptions {
   noiseIntensity?: number;
   /** 노이즈 업데이트 FPS (기본값: 15) */
   noiseFPS?: number;
+  /** 세트(행) 개수 - 셀 이미지를 나눌 행 개수 (기본값: 1) */
+  setCount?: number;
+  /** 세트 선택 모드 (기본값: 'first') */
+  setSelectionMode?: 'first' | 'random' | 'cycle';
 }
 
 /**
@@ -44,6 +48,9 @@ export class AsciiMosaicFilter {
   private backgroundColor: THREE.Color;
   private noiseIntensity: number;
   private noiseFPS: number;
+  /** 셀 이미지를 나눌 행 개수 (= setCount, 모든 셀 이미지 동일 형식) */
+  private setCount: number;
+  private setSelectionMode: 'first' | 'random' | 'cycle';
   private time: number = 0.0;
   private lastNoiseUpdateTime: number = 0.0;
   private isEnabled: boolean = false;
@@ -64,6 +71,9 @@ export class AsciiMosaicFilter {
     uniform sampler2D tAtlas;
     uniform float uMosaicSize;
     uniform float uCellCount;
+    uniform float uRowCount;
+    uniform float uSetCount;
+    uniform float uSetSelectionMode;
     uniform vec2 uResolution;
     uniform vec3 uBackgroundColor;
     uniform float uNoiseIntensity;
@@ -120,15 +130,30 @@ export class AsciiMosaicFilter {
       float cellIndex = floor(invertedBrightness * uCellCount);
       cellIndex = clamp(cellIndex, 0.0, uCellCount - 1.0);
       
-      // 모자이크 셀 아틀라스에서 해당 셀의 UV 좌표 계산 (가로 방향)
+      // 세트 선택 (행 인덱스)
+      float selectedRow = 0.0;
+      if (uSetSelectionMode < 0.5) {
+        selectedRow = 0.0;
+      } else if (uSetSelectionMode < 1.5) {
+        float rand = hash(mosaicCoord);
+        selectedRow = floor(rand * uSetCount);
+      } else {
+        float blockIndex = mosaicCoord.x + mosaicCoord.y * 1000.0;
+        selectedRow = mod(blockIndex, uSetCount);
+      }
+      selectedRow = clamp(selectedRow, 0.0, uSetCount - 1.0);
+      
+      // 모자이크 셀 아틀라스에서 해당 셀의 UV 좌표 계산 (가로 + 세로)
       float uMin = cellIndex / uCellCount;
       float uMax = (cellIndex + 1.0) / uCellCount;
+      float vMin = selectedRow / uRowCount;
+      float vMax = (selectedRow + 1.0) / uRowCount;
       
       // 모자이크 블록 내에서의 로컬 좌표 (0 ~ 1)
       vec2 localCoord = fract(vUv * uResolution / uMosaicSize);
       
-      // 모자이크 셀 아틀라스에서 샘플링
-      vec2 atlasUV = vec2(mix(uMin, uMax, localCoord.x), 1.0 - localCoord.y);
+      // 모자이크 셀 아틀라스에서 샘플링 (행에 따라 V 좌표 적용)
+      vec2 atlasUV = vec2(mix(uMin, uMax, localCoord.x), mix(vMax, vMin, localCoord.y));
       vec4 atlasColor = texture2D(tAtlas, atlasUV);
       
       // 배경색과 atlasColor를 normal 모드로 블렌딩 (알파 블렌딩)
@@ -147,6 +172,8 @@ export class AsciiMosaicFilter {
     this.mosaicSize = options.mosaicSize ?? 8;
     this.noiseIntensity = options.noiseIntensity ?? 0.0; // 기본값: 노이즈 없음
     this.noiseFPS = options.noiseFPS ?? 15; // 기본값: 15 FPS
+    this.setCount = Math.max(1, options.setCount ?? 1);
+    this.setSelectionMode = options.setSelectionMode ?? 'first';
     this.lastNoiseUpdateTime = performance.now();
     
     // 배경색 설정
@@ -180,6 +207,9 @@ export class AsciiMosaicFilter {
           tAtlas: { value: this.atlasResult.texture },
           uMosaicSize: { value: this.mosaicSize },
           uCellCount: { value: this.atlasResult.cellCount },
+          uRowCount: { value: this.setCount },
+          uSetCount: { value: this.setCount },
+          uSetSelectionMode: { value: this.setSelectionMode === 'first' ? 0 : this.setSelectionMode === 'random' ? 1 : 2 },
           uResolution: { value: new THREE.Vector2(width, height) },
           uBackgroundColor: { value: this.backgroundColor },
           uNoiseIntensity: { value: this.noiseIntensity },
@@ -264,6 +294,10 @@ export class AsciiMosaicFilter {
     // 쉐이더 유니폼 업데이트
     this.material.uniforms.tDiffuse.value = this.renderTarget.texture;
     this.material.uniforms.uMosaicSize.value = this.mosaicSize;
+    this.material.uniforms.uRowCount.value = this.setCount;
+    this.material.uniforms.uSetCount.value = this.setCount;
+    this.material.uniforms.uSetSelectionMode.value =
+      this.setSelectionMode === 'first' ? 0 : this.setSelectionMode === 'random' ? 1 : 2;
 
     // 포스트 프로세싱 쿼드 렌더링
     this.renderer.render(this.scene, this.camera);
@@ -326,6 +360,28 @@ export class AsciiMosaicFilter {
   setNoiseFPS(fps: number): void {
     this.noiseFPS = Math.max(1.0, fps); // 최소 1 FPS
     this.lastNoiseUpdateTime = performance.now(); // 리셋하여 즉시 업데이트
+  }
+
+  /**
+   * 세트(행) 개수 설정 - 셀 이미지를 나눌 행 개수
+   */
+  setSetCount(setCount: number): void {
+    this.setCount = Math.max(1, setCount);
+    if (this.material) {
+      this.material.uniforms.uRowCount.value = this.setCount;
+      this.material.uniforms.uSetCount.value = this.setCount;
+    }
+  }
+
+  /**
+   * 세트 선택 모드 설정
+   */
+  setSetSelectionMode(mode: 'first' | 'random' | 'cycle'): void {
+    this.setSelectionMode = mode;
+    if (this.material) {
+      this.material.uniforms.uSetSelectionMode.value =
+        mode === 'first' ? 0 : mode === 'random' ? 1 : 2;
+    }
   }
 
   /**

@@ -19,6 +19,8 @@ declare global {
       mosaicCellTextureUrl?: string;
       textureUrl?: string;
       cellCount?: number;
+      setCount?: number;
+      setSelectionMode?: 'first' | 'random' | 'cycle';
       backgroundColor?: number;
       noiseIntensity?: number;
       noiseFPS?: number;
@@ -54,6 +56,8 @@ interface InstanceConfig {
   mosaicCellTextureUrl?: string;
   textureUrl?: string;
   cellCount?: number;
+  setCount?: number;
+  setSelectionMode?: 'first' | 'random' | 'cycle';
   backgroundColor?: number;
   noiseIntensity?: number;
   noiseFPS?: number;
@@ -147,6 +151,8 @@ async function initContainer(container: HTMLElement): Promise<AscMosaic | null> 
     mosaicSize: config.mosaicSize ?? 10,
     mosaicCellTextureUrl,
     cellCount: config.cellCount ?? 6,
+    setCount: config.setCount ?? 1,
+    setSelectionMode: config.setSelectionMode ?? 'first',
     backgroundColor: config.backgroundColor ?? 0xffffff,
     noiseIntensity: config.noiseIntensity ?? 0,
     noiseFPS: config.noiseFPS ?? 10,
