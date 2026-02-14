@@ -326,6 +326,7 @@ function loadResourceList(): Promise<void> {
 
 // HTML 스니펫 생성 (도형·텍스처·필터 설정 포함, 스니펫/새 창 미리보기에서 동일 config 사용)
 function generateHTMLCode(): string {
+  const camera = mosaic.getCamera();
   const config = {
     shape: currentShape,
     radius: currentRadius,
@@ -341,6 +342,17 @@ function generateHTMLCode(): string {
     backgroundColor: 0xffffff,
     noiseIntensity: currentNoiseIntensity,
     noiseFPS: currentNoiseFPS,
+    cameraPosition: {
+      x: camera.position.x,
+      y: camera.position.y,
+      z: camera.position.z,
+    },
+    cameraRotation: {
+      x: camera.rotation.x,
+      y: camera.rotation.y,
+      z: camera.rotation.z,
+    },
+    enableOrbitControls: false,
   };
   const configJson = JSON.stringify(config);
   return `<div class="canvas-container ascmosaic" style="width:100%;height:500px;" data-ascmosaic-config='${configJson}'></div>

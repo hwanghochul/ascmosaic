@@ -22,6 +22,9 @@ declare global {
       backgroundColor?: number;
       noiseIntensity?: number;
       noiseFPS?: number;
+      cameraPosition?: { x: number; y: number; z: number };
+      cameraRotation?: { x: number; y: number; z: number };
+      enableOrbitControls?: boolean;
     };
     /** Blob 미리보기 등에서 텍스처를 같은 오리진으로 로드할 때 사용 (예: 'https://localhost:5173') */
     ASC_MOSAIC_BASE_URL?: string;
@@ -50,6 +53,9 @@ interface InstanceConfig {
   backgroundColor?: number;
   noiseIntensity?: number;
   noiseFPS?: number;
+  cameraPosition?: { x: number; y: number; z: number };
+  cameraRotation?: { x: number; y: number; z: number };
+  enableOrbitControls?: boolean;
 }
 
 async function initContainer(container: HTMLElement): Promise<AscMosaic | null> {
@@ -89,12 +95,33 @@ async function initContainer(container: HTMLElement): Promise<AscMosaic | null> 
   }
   await mosaic.addModel(earthOptions);
 
-  mosaic.setupOrbitControls({
-    minDistance: 3,
-    maxDistance: 10,
-    rotateSpeed: 1.0,
-    zoomSpeed: 0.1,
-  });
+  // 카메라 위치 설정 (config에 있으면 적용, 없으면 기본값)
+  const camera = mosaic.getCamera();
+  if (config.cameraPosition) {
+    camera.position.set(
+      config.cameraPosition.x,
+      config.cameraPosition.y,
+      config.cameraPosition.z
+    );
+  }
+  if (config.cameraRotation) {
+    camera.rotation.set(
+      config.cameraRotation.x,
+      config.cameraRotation.y,
+      config.cameraRotation.z
+    );
+  }
+  camera.updateProjectionMatrix();
+
+  // OrbitControls 설정 (enableOrbitControls가 false면 비활성화)
+  if (config.enableOrbitControls !== false) {
+    mosaic.setupOrbitControls({
+      minDistance: 3,
+      maxDistance: 10,
+      rotateSpeed: 1.0,
+      zoomSpeed: 0.1,
+    });
+  }
 
   const mosaicCellTextureUrl = resolveTextureUrl(
     config.mosaicCellTextureUrl ?? '/resource/mosaic_cell.png'
