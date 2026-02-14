@@ -15,6 +15,7 @@ export class AscMosaic {
   private renderer: THREE.WebGLRenderer;
   private cube: THREE.Mesh | null = null;
   private earth: THREE.Object3D | null = null;
+  private earthOptions: TexturedMeshOptions | null = null;
   private orbitControls: OrbitControls | null = null;
   private asciiMosaicFilter: AsciiMosaicFilter | null = null;
   private animationFrameId: number | null = null;
@@ -70,6 +71,30 @@ export class AscMosaic {
    * 지구본(텍스처 메시 또는 GLB)을 추가합니다 (구/큐브/평면/glb 선택 가능)
    */
   async addEarth(options?: TexturedMeshOptions): Promise<THREE.Object3D> {
+    const opts = options ?? {};
+    const newShape = opts.shape ?? 'sphere';
+    const newScale = opts.scale ?? 1;
+
+    // 기존 모델이 있고 같은 shape이고 scale만 변경된 경우: scale만 업데이트
+    if (this.earth && this.earthOptions && this.earthOptions.shape === newShape) {
+      const oldScale = this.earthOptions.scale ?? 1;
+      const optionsChanged = 
+        this.earthOptions.radius !== opts.radius ||
+        this.earthOptions.size !== opts.size ||
+        this.earthOptions.width !== opts.width ||
+        this.earthOptions.height !== opts.height ||
+        this.earthOptions.textureUrl !== opts.textureUrl ||
+        this.earthOptions.modelUrl !== opts.modelUrl;
+
+      if (!optionsChanged && oldScale !== newScale) {
+        // scale만 변경: 기존 메시의 scale만 업데이트
+        this.earth.scale.setScalar(newScale);
+        this.earthOptions = { ...opts };
+        return this.earth;
+      }
+    }
+
+    // shape가 변경되었거나 다른 옵션이 변경된 경우: 새로 생성
     if (this.earth) {
       this.scene.remove(this.earth);
       this.earth.traverse((obj) => {
@@ -81,11 +106,40 @@ export class AscMosaic {
       this.earth = null;
     }
 
-    this.earth = await createTexturedMesh(options ?? {});
+    this.earth = await createTexturedMesh(opts);
     this.scene.add(this.earth);
+    this.earthOptions = { ...opts };
 
-    this.camera.position.set(0, 0, 5);
-    this.camera.lookAt(0, 0, 0);
+    // GLB 모델의 경우 bounding box를 계산하여 카메라 위치 조정
+    if (opts.shape === 'glb' && this.earth) {
+      const box = new THREE.Box3().setFromObject(this.earth);
+      if (!box.isEmpty()) {
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        // 모델이 작으면 최소 거리 보장, 크면 모델 크기의 3배 거리
+        const distance = Math.max(maxDim * 3, 5);
+        
+        console.log('GLB bounding box:', {
+          size: { x: size.x.toFixed(3), y: size.y.toFixed(3), z: size.z.toFixed(3) },
+          center: { x: center.x.toFixed(3), y: center.y.toFixed(3), z: center.z.toFixed(3) },
+          maxDim: maxDim.toFixed(3),
+          distance: distance.toFixed(3),
+          scale: opts.scale ?? 1
+        });
+        
+        this.camera.position.set(center.x, center.y, center.z + distance);
+        this.camera.lookAt(center);
+        this.camera.updateProjectionMatrix();
+      } else {
+        console.warn('GLB bounding box가 비어있음');
+        this.camera.position.set(0, 0, 5);
+        this.camera.lookAt(0, 0, 0);
+      }
+    } else {
+      this.camera.position.set(0, 0, 5);
+      this.camera.lookAt(0, 0, 0);
+    }
 
     return this.earth;
   }
