@@ -130,16 +130,21 @@ export class AsciiMosaicFilter {
       float cellIndex = floor(invertedBrightness * uCellCount);
       cellIndex = clamp(cellIndex, 0.0, uCellCount - 1.0);
       
-      // 세트 선택 (행 인덱스)
+      // 세트 선택 (행 인덱스) - 노이즈 FPS에 맞춰 시간에 따라 변경
       float selectedRow = 0.0;
       if (uSetSelectionMode < 0.5) {
+        // first: 항상 첫 번째 세트
         selectedRow = 0.0;
       } else if (uSetSelectionMode < 1.5) {
-        float rand = hash(mosaicCoord);
+        // random: 블록 좌표와 시간을 기반으로 랜덤 선택
+        vec2 timeCoord = mosaicCoord + vec2(uTime * 0.1, uTime * 0.15);
+        float rand = hash(timeCoord);
         selectedRow = floor(rand * uSetCount);
       } else {
+        // cycle: 블록 좌표와 시간을 기반으로 순환 선택
         float blockIndex = mosaicCoord.x + mosaicCoord.y * 1000.0;
-        selectedRow = mod(blockIndex, uSetCount);
+        float timeOffset = floor(uTime * 10.0); // 노이즈 FPS에 맞춰 업데이트
+        selectedRow = mod(blockIndex + timeOffset, uSetCount);
       }
       selectedRow = clamp(selectedRow, 0.0, uSetCount - 1.0);
       
