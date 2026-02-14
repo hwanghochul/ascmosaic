@@ -151,8 +151,10 @@ export class AscMosaic {
 
   /**
    * 기울임 컨트롤을 설정합니다 (마우스 위치에 따라 모델이 기울어짐)
+   * @param invertX X축 반전 여부
+   * @param invertY Y축 반전 여부
    */
-  setupTiltControls(): void {
+  setupTiltControls(invertX: boolean = false, invertY: boolean = false): void {
     // 기존 컨트롤 제거
     if (this.orbitControls) {
       this.orbitControls.dispose();
@@ -175,8 +177,12 @@ export class AscMosaic {
       
       // 중심에서의 거리 (정규화: -1 ~ 1)
       const maxDistance = Math.min(rect.width, rect.height) / 2;
-      const normalizedX = Math.max(-1, Math.min(1, mouseX / maxDistance));
-      const normalizedY = Math.max(-1, Math.min(1, -mouseY / maxDistance)); // Y는 반전 (위쪽이 양수)
+      let normalizedX = Math.max(-1, Math.min(1, mouseX / maxDistance));
+      let normalizedY = Math.max(-1, Math.min(1, -mouseY / maxDistance)); // Y는 반전 (위쪽이 양수)
+      
+      // 반전 옵션 적용
+      if (invertX) normalizedX = -normalizedX;
+      if (invertY) normalizedY = -normalizedY;
       
       // 기울임 각도 계산
       this.model.rotation.y = -normalizedX * maxTiltAngle; // 오른쪽이면 Y축으로 반대 방향 회전

@@ -33,6 +33,9 @@ const scaleValue = document.getElementById('scale-value')!;
 const textureSelectContainer = document.getElementById('texture-select-container')!;
 const textureSelect = document.getElementById('texture-select')! as HTMLSelectElement;
 const controlModeSelect = document.getElementById('control-mode-select')! as HTMLSelectElement;
+const tiltInvertContainer = document.getElementById('tilt-invert-container')!;
+const tiltInvertX = document.getElementById('tilt-invert-x')! as HTMLInputElement;
+const tiltInvertY = document.getElementById('tilt-invert-y')! as HTMLInputElement;
 const cellCountContainer = document.getElementById('cell-count-container')!;
 const cellCountSlider = document.getElementById('cell-count-slider')! as HTMLInputElement;
 const cellCountValue = document.getElementById('cell-count-value')!;
@@ -73,6 +76,8 @@ let currentPlaneHeight = 4;
 let currentModelUrl = '';
 let currentScale = 1;
 let currentControlMode: 'orbit' | 'fixed' | 'tilt' = 'orbit';
+let currentTiltInvertX = false;
+let currentTiltInvertY = false;
 
 function getEarthOptions() {
   const base: Record<string, unknown> = {
@@ -279,6 +284,13 @@ textureSelect.addEventListener('change', async () => {
 controlModeSelect.addEventListener('change', () => {
   currentControlMode = controlModeSelect.value as 'orbit' | 'fixed' | 'tilt';
   
+  // 기울임 반전 UI 표시/숨김
+  if (currentControlMode === 'tilt') {
+    tiltInvertContainer.style.display = 'flex';
+  } else {
+    tiltInvertContainer.style.display = 'none';
+  }
+  
   // 에디터에서도 즉시 적용
   if (currentControlMode === 'orbit') {
     mosaic.disableTiltControls();
@@ -289,7 +301,7 @@ controlModeSelect.addEventListener('change', () => {
       zoomSpeed: 0.1,
     });
   } else if (currentControlMode === 'tilt') {
-    mosaic.setupTiltControls();
+    mosaic.setupTiltControls(currentTiltInvertX, currentTiltInvertY);
   } else {
     // fixed: 모든 컨트롤 제거
     mosaic.disableTiltControls();
@@ -297,6 +309,21 @@ controlModeSelect.addEventListener('change', () => {
     if (orbitControls) {
       orbitControls.dispose();
     }
+  }
+});
+
+// 기울임 반전 체크박스 이벤트
+tiltInvertX.addEventListener('change', () => {
+  currentTiltInvertX = tiltInvertX.checked;
+  if (currentControlMode === 'tilt') {
+    mosaic.setupTiltControls(currentTiltInvertX, currentTiltInvertY);
+  }
+});
+
+tiltInvertY.addEventListener('change', () => {
+  currentTiltInvertY = tiltInvertY.checked;
+  if (currentControlMode === 'tilt') {
+    mosaic.setupTiltControls(currentTiltInvertX, currentTiltInvertY);
   }
 });
 
@@ -380,6 +407,8 @@ function generateHTMLCode(): string {
       z: camera.rotation.z,
     },
     controlMode: currentControlMode,
+    tiltInvertX: currentTiltInvertX,
+    tiltInvertY: currentTiltInvertY,
   };
   const configJson = JSON.stringify(config);
   return `<div class="canvas-container ascmosaic" style="width:100%;height:500px;" data-ascmosaic-config='${configJson}'></div>

@@ -25,6 +25,8 @@ declare global {
       cameraPosition?: { x: number; y: number; z: number };
       cameraRotation?: { x: number; y: number; z: number };
       controlMode?: 'orbit' | 'fixed' | 'tilt';
+      tiltInvertX?: boolean;
+      tiltInvertY?: boolean;
     };
     /** Blob 미리보기 등에서 텍스처를 같은 오리진으로 로드할 때 사용 (예: 'https://localhost:5173') */
     ASC_MOSAIC_BASE_URL?: string;
@@ -56,6 +58,8 @@ interface InstanceConfig {
   cameraPosition?: { x: number; y: number; z: number };
   cameraRotation?: { x: number; y: number; z: number };
   controlMode?: 'orbit' | 'fixed' | 'tilt';
+  tiltInvertX?: boolean;
+  tiltInvertY?: boolean;
 }
 
 async function initContainer(container: HTMLElement): Promise<AscMosaic | null> {
@@ -123,7 +127,9 @@ async function initContainer(container: HTMLElement): Promise<AscMosaic | null> 
       zoomSpeed: 0.1,
     });
   } else if (controlMode === 'tilt') {
-    mosaic.setupTiltControls();
+    const invertX = config.tiltInvertX ?? false;
+    const invertY = config.tiltInvertY ?? false;
+    mosaic.setupTiltControls(invertX, invertY);
   }
   // 'fixed' 모드는 컨트롤을 설정하지 않음
 
