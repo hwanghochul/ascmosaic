@@ -20,6 +20,12 @@ export class AscMosaic {
   private tiltControlsEnabled: boolean = false;
   private tiltMouseMoveHandler: ((e: MouseEvent) => void) | null = null;
   private tiltMouseLeaveHandler: (() => void) | null = null;
+  private tiltResetAnimationId: number | null = null;
+  private tiltTargetRotationX: number = 0;
+  private tiltTargetRotationY: number = 0;
+  private tiltAnimationId: number | null = null;
+  private tiltMaxAngle: number = Math.PI / 6; // 기본값: 30도
+  private tiltSmoothness: number = 0.15; // 기본값: 0.15 (lerp factor)
   private container: HTMLElement;
   private asciiMosaicFilter: AsciiMosaicFilter | null = null;
   private animationFrameId: number | null = null;
@@ -153,8 +159,15 @@ export class AscMosaic {
    * 기울임 컨트롤을 설정합니다 (마우스 위치에 따라 모델이 기울어짐)
    * @param invertX X축 반전 여부
    * @param invertY Y축 반전 여부
+   * @param maxTiltAngle 최대 기울임 각도 (라디안, 기본값: Math.PI / 6 = 30도)
+   * @param smoothness 스무스 속도 (0~1, 값이 클수록 빠름, 기본값: 0.15)
    */
-  setupTiltControls(invertX: boolean = false, invertY: boolean = false): void {
+  setupTiltControls(
+    invertX: boolean = false, 
+    invertY: boolean = false,
+    maxTiltAngle: number = Math.PI / 6,
+    smoothness: number = 0.15
+  ): void {
     // 기존 컨트롤 제거
     if (this.orbitControls) {
       this.orbitControls.dispose();
@@ -163,10 +176,53 @@ export class AscMosaic {
     this.disableTiltControls(); // 기존 이벤트 리스너 제거
 
     this.tiltControlsEnabled = true;
-    const maxTiltAngle = Math.PI / 6; // 최대 30도 기울임
+    this.tiltMaxAngle = maxTiltAngle;
+    this.tiltSmoothness = Math.max(0.01, Math.min(1, smoothness)); // 0.01~1 사이로 제한
+    
+    // 목표 rotation 초기화
+    this.tiltTargetRotationX = 0;
+    this.tiltTargetRotationY = 0;
+    if (this.model) {
+      this.model.rotation.x = 0;
+      this.model.rotation.y = 0;
+    }
+
+    // 애니메이션 루프 (목표 rotation으로 부드럽게 전환)
+    const animateToTarget = () => {
+      if (!this.model || !this.tiltControlsEnabled) {
+        this.tiltAnimationId = null;
+        return;
+      }
+
+      const currentX = this.model.rotation.x;
+      const currentY = this.model.rotation.y;
+      const targetX = this.tiltTargetRotationX;
+      const targetY = this.tiltTargetRotationY;
+      
+      // 부드러운 전환 (lerp) - 설정된 smoothness 사용
+      const newX = currentX + (targetX - currentX) * this.tiltSmoothness;
+      const newY = currentY + (targetY - currentY) * this.tiltSmoothness;
+      
+      // 거의 목표에 도달했으면 정확히 설정
+      if (Math.abs(newX - targetX) < 0.001 && Math.abs(newY - targetY) < 0.001) {
+        this.model.rotation.x = targetX;
+        this.model.rotation.y = targetY;
+        this.tiltAnimationId = null;
+      } else {
+        this.model.rotation.x = newX;
+        this.model.rotation.y = newY;
+        this.tiltAnimationId = requestAnimationFrame(animateToTarget);
+      }
+    };
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!this.tiltControlsEnabled || !this.model) return;
+
+      // 마우스가 다시 들어오면 리셋 애니메이션 취소
+      if (this.tiltResetAnimationId !== null) {
+        cancelAnimationFrame(this.tiltResetAnimationId);
+        this.tiltResetAnimationId = null;
+      }
 
       const rect = this.container.getBoundingClientRect();
       const centerX = rect.left + rect.width / 2;
@@ -184,15 +240,32 @@ export class AscMosaic {
       if (invertX) normalizedX = -normalizedX;
       if (invertY) normalizedY = -normalizedY;
       
-      // 기울임 각도 계산
-      this.model.rotation.y = -normalizedX * maxTiltAngle; // 오른쪽이면 Y축으로 반대 방향 회전
-      this.model.rotation.x = normalizedY * maxTiltAngle; // 위쪽이면 위로 기울임
+      // 목표 기울임 각도 설정
+      this.tiltTargetRotationY = -normalizedX * this.tiltMaxAngle; // 오른쪽이면 Y축으로 반대 방향 회전
+      this.tiltTargetRotationX = normalizedY * this.tiltMaxAngle; // 위쪽이면 위로 기울임
+      
+      // 애니메이션 시작 (이미 실행 중이면 계속 실행)
+      if (this.tiltAnimationId === null) {
+        this.tiltAnimationId = requestAnimationFrame(animateToTarget);
+      }
     };
 
     const handleMouseLeave = () => {
-      if (this.model) {
-        this.model.rotation.x = 0;
-        this.model.rotation.y = 0;
+      if (!this.model) return;
+      
+      // 기존 리셋 애니메이션 취소 (이제 사용하지 않음)
+      if (this.tiltResetAnimationId !== null) {
+        cancelAnimationFrame(this.tiltResetAnimationId);
+        this.tiltResetAnimationId = null;
+      }
+      
+      // 목표 rotation을 0으로 설정하고 기존 애니메이션 루프 사용
+      this.tiltTargetRotationX = 0;
+      this.tiltTargetRotationY = 0;
+      
+      // 애니메이션 루프 시작 (이미 실행 중이면 계속 실행)
+      if (this.tiltAnimationId === null) {
+        this.tiltAnimationId = requestAnimationFrame(animateToTarget);
       }
     };
 
@@ -207,6 +280,21 @@ export class AscMosaic {
    */
   disableTiltControls(): void {
     this.tiltControlsEnabled = false;
+    
+    // 애니메이션 취소
+    if (this.tiltResetAnimationId !== null) {
+      cancelAnimationFrame(this.tiltResetAnimationId);
+      this.tiltResetAnimationId = null;
+    }
+    if (this.tiltAnimationId !== null) {
+      cancelAnimationFrame(this.tiltAnimationId);
+      this.tiltAnimationId = null;
+    }
+    
+    // 목표 rotation 초기화
+    this.tiltTargetRotationX = 0;
+    this.tiltTargetRotationY = 0;
+    
     if (this.tiltMouseMoveHandler) {
       this.container.removeEventListener('mousemove', this.tiltMouseMoveHandler);
       this.tiltMouseMoveHandler = null;

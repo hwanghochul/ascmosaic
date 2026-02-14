@@ -107,6 +107,32 @@
       cursor: pointer;
     }
 
+    .tilt-settings-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      margin-bottom: 10px;
+    }
+
+    .tilt-setting-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .tilt-setting-item label {
+      font-weight: 500;
+      color: #333;
+      min-width: 180px;
+    }
+
+    .tilt-setting-item input[type="range"] {
+      flex: 1;
+    }
+
     .cell-select-container label,
     .texture-select-container label,
     .shape-select-container label,
@@ -403,6 +429,19 @@
       <label>
         <input type="checkbox" id="tilt-invert-y"> Y축 반전
       </label>
+    </div>
+
+    <div class="tilt-settings-container" id="tilt-settings-container" style="display: none;">
+      <div class="tilt-setting-item">
+        <label for="tilt-max-angle">최대 기울임 각도 (도):</label>
+        <input type="range" id="tilt-max-angle" min="5" max="90" value="30" step="1">
+        <span class="slider-value" id="tilt-max-angle-value">30</span>
+      </div>
+      <div class="tilt-setting-item">
+        <label for="tilt-smoothness">스무스 속도:</label>
+        <input type="range" id="tilt-smoothness" min="0.01" max="1" value="0.15" step="0.01">
+        <span class="slider-value" id="tilt-smoothness-value">0.15</span>
+      </div>
     </div>
 
     <div class="code-generation-container" style="margin-top: 20px;">

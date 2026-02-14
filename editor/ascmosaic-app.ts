@@ -27,6 +27,8 @@ declare global {
       controlMode?: 'orbit' | 'fixed' | 'tilt';
       tiltInvertX?: boolean;
       tiltInvertY?: boolean;
+      tiltMaxAngle?: number;
+      tiltSmoothness?: number;
     };
     /** Blob 미리보기 등에서 텍스처를 같은 오리진으로 로드할 때 사용 (예: 'https://localhost:5173') */
     ASC_MOSAIC_BASE_URL?: string;
@@ -60,6 +62,8 @@ interface InstanceConfig {
   controlMode?: 'orbit' | 'fixed' | 'tilt';
   tiltInvertX?: boolean;
   tiltInvertY?: boolean;
+  tiltMaxAngle?: number;
+  tiltSmoothness?: number;
 }
 
 async function initContainer(container: HTMLElement): Promise<AscMosaic | null> {
@@ -129,7 +133,10 @@ async function initContainer(container: HTMLElement): Promise<AscMosaic | null> 
   } else if (controlMode === 'tilt') {
     const invertX = config.tiltInvertX ?? false;
     const invertY = config.tiltInvertY ?? false;
-    mosaic.setupTiltControls(invertX, invertY);
+    const maxAngle = config.tiltMaxAngle ?? 30;
+    const smoothness = config.tiltSmoothness ?? 0.15;
+    const maxAngleRad = (maxAngle * Math.PI) / 180; // 도를 라디안으로 변환
+    mosaic.setupTiltControls(invertX, invertY, maxAngleRad, smoothness);
   }
   // 'fixed' 모드는 컨트롤을 설정하지 않음
 

@@ -36,6 +36,11 @@ const controlModeSelect = document.getElementById('control-mode-select')! as HTM
 const tiltInvertContainer = document.getElementById('tilt-invert-container')!;
 const tiltInvertX = document.getElementById('tilt-invert-x')! as HTMLInputElement;
 const tiltInvertY = document.getElementById('tilt-invert-y')! as HTMLInputElement;
+const tiltSettingsContainer = document.getElementById('tilt-settings-container')!;
+const tiltMaxAngleSlider = document.getElementById('tilt-max-angle')! as HTMLInputElement;
+const tiltMaxAngleValue = document.getElementById('tilt-max-angle-value')!;
+const tiltSmoothnessSlider = document.getElementById('tilt-smoothness')! as HTMLInputElement;
+const tiltSmoothnessValue = document.getElementById('tilt-smoothness-value')!;
 const cellCountContainer = document.getElementById('cell-count-container')!;
 const cellCountSlider = document.getElementById('cell-count-slider')! as HTMLInputElement;
 const cellCountValue = document.getElementById('cell-count-value')!;
@@ -78,6 +83,8 @@ let currentScale = 1;
 let currentControlMode: 'orbit' | 'fixed' | 'tilt' = 'orbit';
 let currentTiltInvertX = false;
 let currentTiltInvertY = false;
+let currentTiltMaxAngle = 30; // 도 단위
+let currentTiltSmoothness = 0.15;
 
 function getEarthOptions() {
   const base: Record<string, unknown> = {
@@ -284,11 +291,13 @@ textureSelect.addEventListener('change', async () => {
 controlModeSelect.addEventListener('change', () => {
   currentControlMode = controlModeSelect.value as 'orbit' | 'fixed' | 'tilt';
   
-  // 기울임 반전 UI 표시/숨김
+  // 기울임 반전 UI 및 설정 UI 표시/숨김
   if (currentControlMode === 'tilt') {
     tiltInvertContainer.style.display = 'flex';
+    tiltSettingsContainer.style.display = 'flex';
   } else {
     tiltInvertContainer.style.display = 'none';
+    tiltSettingsContainer.style.display = 'none';
   }
   
   // 에디터에서도 즉시 적용
@@ -301,7 +310,8 @@ controlModeSelect.addEventListener('change', () => {
       zoomSpeed: 0.1,
     });
   } else if (currentControlMode === 'tilt') {
-    mosaic.setupTiltControls(currentTiltInvertX, currentTiltInvertY);
+    const maxAngleRad = (currentTiltMaxAngle * Math.PI) / 180; // 도를 라디안으로 변환
+    mosaic.setupTiltControls(currentTiltInvertX, currentTiltInvertY, maxAngleRad, currentTiltSmoothness);
   } else {
     // fixed: 모든 컨트롤 제거
     mosaic.disableTiltControls();
@@ -316,14 +326,36 @@ controlModeSelect.addEventListener('change', () => {
 tiltInvertX.addEventListener('change', () => {
   currentTiltInvertX = tiltInvertX.checked;
   if (currentControlMode === 'tilt') {
-    mosaic.setupTiltControls(currentTiltInvertX, currentTiltInvertY);
+    const maxAngleRad = (currentTiltMaxAngle * Math.PI) / 180;
+    mosaic.setupTiltControls(currentTiltInvertX, currentTiltInvertY, maxAngleRad, currentTiltSmoothness);
   }
 });
 
 tiltInvertY.addEventListener('change', () => {
   currentTiltInvertY = tiltInvertY.checked;
   if (currentControlMode === 'tilt') {
-    mosaic.setupTiltControls(currentTiltInvertX, currentTiltInvertY);
+    const maxAngleRad = (currentTiltMaxAngle * Math.PI) / 180;
+    mosaic.setupTiltControls(currentTiltInvertX, currentTiltInvertY, maxAngleRad, currentTiltSmoothness);
+  }
+});
+
+// 기울임 최대 각도 슬라이더 이벤트
+tiltMaxAngleSlider.addEventListener('input', () => {
+  currentTiltMaxAngle = parseFloat(tiltMaxAngleSlider.value);
+  tiltMaxAngleValue.textContent = currentTiltMaxAngle.toString();
+  if (currentControlMode === 'tilt') {
+    const maxAngleRad = (currentTiltMaxAngle * Math.PI) / 180;
+    mosaic.setupTiltControls(currentTiltInvertX, currentTiltInvertY, maxAngleRad, currentTiltSmoothness);
+  }
+});
+
+// 기울임 스무스 속도 슬라이더 이벤트
+tiltSmoothnessSlider.addEventListener('input', () => {
+  currentTiltSmoothness = parseFloat(tiltSmoothnessSlider.value);
+  tiltSmoothnessValue.textContent = currentTiltSmoothness.toFixed(2);
+  if (currentControlMode === 'tilt') {
+    const maxAngleRad = (currentTiltMaxAngle * Math.PI) / 180;
+    mosaic.setupTiltControls(currentTiltInvertX, currentTiltInvertY, maxAngleRad, currentTiltSmoothness);
   }
 });
 
@@ -409,6 +441,8 @@ function generateHTMLCode(): string {
     controlMode: currentControlMode,
     tiltInvertX: currentTiltInvertX,
     tiltInvertY: currentTiltInvertY,
+    tiltMaxAngle: currentTiltMaxAngle,
+    tiltSmoothness: currentTiltSmoothness,
   };
   const configJson = JSON.stringify(config);
   return `<div class="canvas-container ascmosaic" style="width:100%;height:500px;" data-ascmosaic-config='${configJson}'></div>
@@ -464,6 +498,10 @@ previewHtmlBtn.addEventListener('click', () => {
     setTimeout(() => URL.revokeObjectURL(url), 100);
   }
 });
+
+// 초기 슬라이더 값 표시 업데이트
+tiltMaxAngleValue.textContent = currentTiltMaxAngle.toString();
+tiltSmoothnessValue.textContent = currentTiltSmoothness.toFixed(2);
 
 // 리소스 로드 후 애니메이션 시작
 loadResourceList().then(() => animate());
