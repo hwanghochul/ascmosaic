@@ -610,42 +610,61 @@ function loadResourceList(): Promise<void> {
 // HTML 스니펫 생성 (도형·텍스처·필터 설정 포함, 스니펫/새 창 미리보기에서 동일 config 사용)
 function generateHTMLCode(): string {
   const camera = mosaic.getCamera();
-  const config = {
+  const config: any = {
     shape: currentShape,
-    radius: currentRadius,
-    size: currentCubeSize,
-    width: currentPlaneWidth,
-    height: currentPlaneHeight,
-    modelUrl: currentModelUrl || undefined,
-    scale: currentScale,
-    mosaicSize: currentMosaicSize,
-    mosaicCellTextureUrl: currentCellUrl,
-    textureUrl: currentEarthTextureUrl,
-    textureType: currentTextureType,
-    cellCount: currentCellCount,
-    setCount: currentSetCount,
-    setSelectionMode: currentSetSelectionMode,
-    backgroundColor: 0xffffff,
-    noiseIntensity: currentNoiseIntensity,
-    noiseFPS: currentNoiseFPS,
-    cameraPosition: {
-      x: camera.position.x,
-      y: camera.position.y,
-      z: camera.position.z,
-    },
-    cameraRotation: {
-      x: camera.rotation.x,
-      y: camera.rotation.y,
-      z: camera.rotation.z,
-    },
-    controlMode: currentControlMode,
-    tiltInvertX: currentTiltInvertX,
-    tiltInvertY: currentTiltInvertY,
-    tiltMaxAngle: currentTiltMaxAngle,
-    tiltSmoothness: currentTiltSmoothness,
-    canvasWidth: currentCanvasWidth,
-    canvasHeight: currentCanvasHeight,
   };
+  
+  // 도형별 필요한 파라미터만 추가
+  if (currentShape === 'sphere') {
+    config.radius = currentRadius;
+  } else if (currentShape === 'cube') {
+    config.size = currentCubeSize;
+  } else if (currentShape === 'plane') {
+    config.width = currentPlaneWidth;
+    config.height = currentPlaneHeight;
+  } else if (currentShape === 'glb') {
+    if (currentModelUrl) config.modelUrl = currentModelUrl;
+  }
+  
+  // 공통 파라미터
+  if (currentScale !== 1) config.scale = currentScale;
+  if (currentMosaicSize !== 10) config.mosaicSize = currentMosaicSize;
+  if (currentCellUrl) config.mosaicCellTextureUrl = currentCellUrl;
+  if (currentEarthTextureUrl) config.textureUrl = currentEarthTextureUrl;
+  if (currentTextureType !== 'image') config.textureType = currentTextureType;
+  if (currentCellCount !== 6) config.cellCount = currentCellCount;
+  if (currentSetCount !== 1) config.setCount = currentSetCount;
+  if (currentSetSelectionMode !== 'first') config.setSelectionMode = currentSetSelectionMode;
+  if (currentNoiseIntensity !== 0) config.noiseIntensity = currentNoiseIntensity;
+  if (currentNoiseFPS !== 10) config.noiseFPS = currentNoiseFPS;
+  
+  // 카메라 위치/회전
+  config.cameraPosition = {
+    x: camera.position.x,
+    y: camera.position.y,
+    z: camera.position.z,
+  };
+  config.cameraRotation = {
+    x: camera.rotation.x,
+    y: camera.rotation.y,
+    z: camera.rotation.z,
+  };
+  
+  // 컨트롤 모드
+  if (currentControlMode !== 'orbit') config.controlMode = currentControlMode;
+  
+  // 틸트 컨트롤 파라미터는 틸트 모드일 때만 추가
+  if (currentControlMode === 'tilt') {
+    if (currentTiltInvertX) config.tiltInvertX = currentTiltInvertX;
+    if (currentTiltInvertY) config.tiltInvertY = currentTiltInvertY;
+    if (currentTiltMaxAngle !== 30) config.tiltMaxAngle = currentTiltMaxAngle;
+    if (currentTiltSmoothness !== 0.15) config.tiltSmoothness = currentTiltSmoothness;
+  }
+  
+  // 캔버스 크기
+  if (currentCanvasWidth !== 800) config.canvasWidth = currentCanvasWidth;
+  if (currentCanvasHeight !== 600) config.canvasHeight = currentCanvasHeight;
+  
   const configJson = JSON.stringify(config);
   return `<!-- AscMosaic 캔버스 -->
 <div class="canvas-container ascmosaic" style="width:${currentCanvasWidth}px;height:${currentCanvasHeight}px;" data-ascmosaic-config='${configJson}'></div>
