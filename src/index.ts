@@ -118,8 +118,11 @@ export class AscMosaic {
                 newGeometry = new THREE.SphereGeometry(radius, widthSegments, heightSegments);
             }
             
-            // geometry 교체 (material은 유지)
+            // geometry 교체 및 material side 속성 업데이트
             obj.geometry = newGeometry;
+            if (obj.material instanceof THREE.MeshBasicMaterial) {
+              obj.material.side = newShape === 'plane' ? THREE.DoubleSide : THREE.FrontSide;
+            }
             oldGeometry.dispose();
           }
         });

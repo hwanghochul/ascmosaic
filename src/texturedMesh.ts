@@ -184,13 +184,17 @@ export function createTexturedMesh(options: TexturedMeshOptions = {}): Promise<T
       const material = new THREE.MeshBasicMaterial({
         color: 0xffffff,
         map: texture,
+        side: shape === 'plane' ? THREE.DoubleSide : THREE.FrontSide,
       });
       const mesh = new THREE.Mesh(geometry, material);
       mesh.name = 'TexturedMesh';
       mesh.scale.setScalar(scale);
       return mesh;
     }).catch(() => {
-      const material = new THREE.MeshBasicMaterial({ color: 0x4a90e2 });
+      const material = new THREE.MeshBasicMaterial({ 
+        color: 0x4a90e2,
+        side: shape === 'plane' ? THREE.DoubleSide : THREE.FrontSide,
+      });
       const mesh = new THREE.Mesh(geometry, material);
       mesh.name = 'TexturedMesh';
       mesh.scale.setScalar(scale);
@@ -219,6 +223,7 @@ export function createTexturedMesh(options: TexturedMeshOptions = {}): Promise<T
 
   const materialOptions: THREE.MeshBasicMaterialParameters = {
     color: 0xffffff,
+    side: shape === 'plane' ? THREE.DoubleSide : THREE.FrontSide,
   };
   if (texture && !textureLoadFailed) {
     materialOptions.map = texture;
