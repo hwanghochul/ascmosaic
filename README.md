@@ -59,6 +59,8 @@ npm run build
 - `dist/ascmosaic.js` - ES 모듈 버전
 - `dist/ascmosaic.umd.cjs` - UMD 버전
 - `dist/index.d.ts` - TypeScript 타입 정의
+- `dist/index.html` - 에디터 HTML
+- `dist/ascmosaic-app.js` - 스니펫 앱 진입점
 
 ### 개발 모드
 
@@ -69,6 +71,38 @@ npm run dev
 ```
 
 브라우저에서 `http://localhost:5173` 접속하여 에디터를 사용할 수 있습니다.
+
+## GitHub Pages 배포
+
+이 프로젝트는 GitHub Pages로 자동 배포됩니다.
+
+### 자동 배포 설정
+
+1. **GitHub 저장소 설정**
+   - 저장소의 Settings → Pages로 이동
+   - Source를 "GitHub Actions"로 선택
+
+2. **자동 배포**
+   - `main` 브랜치에 푸시하면 자동으로 빌드 및 배포됩니다
+   - GitHub Actions 워크플로우가 자동으로 실행됩니다
+
+3. **배포 확인**
+   - Actions 탭에서 배포 상태 확인
+   - 배포 완료 후 `https://<username>.github.io/<repository-name>`에서 접속 가능
+
+### 수동 배포
+
+필요한 경우 수동으로 배포할 수도 있습니다:
+
+```bash
+# 빌드 실행
+npm run build
+
+# dist 폴더의 내용을 gh-pages 브랜치에 푸시
+# (또는 GitHub Actions를 사용하는 것이 권장됩니다)
+```
+
+**참고**: `.gitignore`에서 `dist/` 폴더는 제외되어 있지만, GitHub Actions가 자동으로 빌드하여 배포합니다.
 
 ## 에디터 사용
 
