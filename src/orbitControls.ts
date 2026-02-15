@@ -99,28 +99,41 @@ export class OrbitControls {
     this.autoRotateSpeed = options.autoRotateSpeed ?? 1.0;
 
     // 초기 카메라 위치에서 각도 계산
-    const cameraToTarget = new THREE.Vector3().subVectors(this.target, this.camera.position);
-    this.distance = cameraToTarget.length();
+    // 카메라 위치를 타겟 기준 상대 좌표로 변환
+    const relativePos = new THREE.Vector3()
+      .subVectors(this.camera.position, this.target);
+    
+    this.distance = relativePos.length();
     
     // 거리가 너무 작으면 기본값 사용
     if (this.distance < 0.001) {
       this.distance = this.camera.position.length() || 5;
     }
     
-    // 현재 카메라 위치에서 타겟으로의 방향 벡터 계산
-    const direction = new THREE.Vector3()
-      .subVectors(this.camera.position, this.target)
-      .normalize();
+    // updateCamera()에서 사용하는 공식과 역으로 계산
+    // x = distance * sin(phi) * cos(theta)
+    // y = distance * cos(phi)
+    // z = distance * sin(phi) * sin(theta)
     
-    // 수평 각도 (theta): XZ 평면에서의 각도
-    // atan2(x, z)를 사용하여 -π ~ π 범위의 각도 계산
-    const calculatedTheta = Math.atan2(direction.x, direction.z);
-    this.theta = options.initialTheta !== undefined ? options.initialTheta : calculatedTheta;
-    
-    // 수직 각도 (phi): Y축과의 각도 (0 = 위, π = 아래)
-    // direction.y가 -1 ~ 1 범위에 있도록 클램프
-    const clampedY = Math.max(-1, Math.min(1, direction.y));
+    // phi 계산: y = distance * cos(phi) => phi = acos(y / distance)
+    const normalizedY = relativePos.y / this.distance;
+    const clampedY = Math.max(-1, Math.min(1, normalizedY));
     this.phi = Math.acos(clampedY);
+    
+    // theta 계산: x = distance * sin(phi) * cos(theta), z = distance * sin(phi) * sin(theta)
+    // cos(theta) = x / (distance * sin(phi)), sin(theta) = z / (distance * sin(phi))
+    const sinPhi = Math.sin(this.phi);
+    if (Math.abs(sinPhi) > 0.001) {
+      // sin(phi)가 0이 아닐 때만 계산
+      // atan2(sin(theta), cos(theta)) = atan2(z / (distance * sin(phi)), x / (distance * sin(phi)))
+      // = atan2(z, x)
+      const calculatedTheta = Math.atan2(relativePos.z, relativePos.x);
+      this.theta = options.initialTheta !== undefined ? options.initialTheta : calculatedTheta;
+    } else {
+      // sin(phi)가 0에 가까우면 (위나 아래를 직접 봄) theta는 의미 없음
+      // 기본값으로 0 사용
+      this.theta = options.initialTheta !== undefined ? options.initialTheta : 0;
+    }
 
     // 이벤트 핸들러 바인딩
     this.onMouseDownHandler = this.onMouseDown.bind(this);
@@ -135,9 +148,43 @@ export class OrbitControls {
     this.domElement.addEventListener('mouseleave', this.onMouseUpHandler);
     this.domElement.addEventListener('wheel', this.onWheelHandler);
 
-    // 초기 카메라 위치는 그대로 유지
-    // 각도만 계산하여 저장하고, 사용자가 조작할 때만 카메라 위치 업데이트
-    // updateCamera()를 호출하지 않음으로써 현재 카메라 위치가 변경되지 않도록 함
+    // 각도 계산이 정확한지 검증
+    // 계산된 각도로 카메라 위치를 재계산하여 원래 위치와 비교
+    const originalPosition = this.camera.position.clone();
+    this.updateCamera();
+    const calculatedPosition = this.camera.position.clone();
+    
+    // 위치 차이 계산
+    const positionDiff = originalPosition.distanceTo(calculatedPosition);
+    const positionThreshold = 0.01; // 0.01 단위 이내면 정확한 것으로 간주
+    
+    if (positionDiff > positionThreshold) {
+      // 각도 계산이 부정확함 - 원래 위치로 복원
+      this.camera.position.copy(originalPosition);
+      
+      // 각도를 다시 정확하게 계산
+      const relativePos2 = new THREE.Vector3()
+        .subVectors(this.camera.position, this.target);
+      this.distance = relativePos2.length();
+      
+      if (this.distance > 0.001) {
+        const normalizedY2 = relativePos2.y / this.distance;
+        const clampedY2 = Math.max(-1, Math.min(1, normalizedY2));
+        this.phi = Math.acos(clampedY2);
+        
+        const sinPhi2 = Math.sin(this.phi);
+        if (Math.abs(sinPhi2) > 0.001) {
+          // 정확한 theta 계산: atan2(z, x)
+          this.theta = Math.atan2(relativePos2.z, relativePos2.x);
+        } else {
+          // sin(phi)가 0에 가까우면 theta는 의미 없음
+          this.theta = options.initialTheta !== undefined ? options.initialTheta : 0;
+        }
+      }
+    } else {
+      // 각도 계산이 정확함 - 원래 위치로 복원 (사용자가 원하는 현재 위치 유지)
+      this.camera.position.copy(originalPosition);
+    }
   }
 
   /**
