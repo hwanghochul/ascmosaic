@@ -20,6 +20,8 @@ export interface OrbitControlsOptions {
   autoRotate?: boolean;
   /** 자동 회전 속도 */
   autoRotateSpeed?: number;
+  /** 초기 수평 각도 (라디안, 기본값: Math.PI / 2 = 90도) */
+  initialTheta?: number;
 }
 
 /**
@@ -79,7 +81,8 @@ export class OrbitControls {
       .subVectors(this.camera.position, this.target)
       .normalize();
     this.distance = this.camera.position.distanceTo(this.target);
-    this.theta = Math.atan2(direction.x, direction.z);
+    // 초기 수평 각도 설정 (옵션이 있으면 사용, 없으면 기본값 90도)
+    this.theta = options.initialTheta ?? Math.PI / 2;
     this.phi = Math.acos(direction.y);
 
     // 이벤트 핸들러 바인딩
