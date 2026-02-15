@@ -76,32 +76,86 @@ export class AscMosaic {
     const newShape = opts.shape ?? 'sphere';
     const newScale = opts.scale ?? 1;
 
-    // 기존 모델이 있고 같은 shape이고 scale만 변경된 경우: scale만 업데이트
+    // 기존 모델이 있고 같은 shape인 경우
     if (this.model && this.modelOptions && this.modelOptions.shape === newShape) {
       const oldScale = this.modelOptions.scale ?? 1;
-      const optionsChanged = 
+      const textureChanged = 
+        this.modelOptions.textureUrl !== opts.textureUrl ||
+        this.modelOptions.textureType !== opts.textureType ||
+        this.modelOptions.modelUrl !== opts.modelUrl;
+      
+      const geometryChanged = 
         this.modelOptions.radius !== opts.radius ||
         this.modelOptions.size !== opts.size ||
         this.modelOptions.width !== opts.width ||
-        this.modelOptions.height !== opts.height ||
-        this.modelOptions.textureUrl !== opts.textureUrl ||
-        this.modelOptions.modelUrl !== opts.modelUrl;
+        this.modelOptions.height !== opts.height;
 
-      if (!optionsChanged && oldScale !== newScale) {
-        // scale만 변경: 기존 메시의 scale만 업데이트
+      // 텍스처가 변경되지 않고 geometry만 변경된 경우: geometry만 교체
+      if (!textureChanged && geometryChanged && newShape !== 'glb') {
+        this.model.traverse((obj) => {
+          if (obj instanceof THREE.Mesh && obj.geometry) {
+            const oldGeometry = obj.geometry;
+            // 새 geometry 생성
+            const radius = opts.radius ?? 2;
+            const widthSegments = opts.widthSegments ?? 64;
+            const heightSegments = opts.heightSegments ?? 32;
+            const size = opts.size ?? 4;
+            const width = opts.width ?? 4;
+            const height = opts.height ?? 4;
+
+            let newGeometry: THREE.BufferGeometry;
+            switch (newShape) {
+              case 'sphere':
+                newGeometry = new THREE.SphereGeometry(radius, widthSegments, heightSegments);
+                break;
+              case 'cube':
+                newGeometry = new THREE.BoxGeometry(size, size, size);
+                break;
+              case 'plane':
+                newGeometry = new THREE.PlaneGeometry(width, height);
+                break;
+              default:
+                newGeometry = new THREE.SphereGeometry(radius, widthSegments, heightSegments);
+            }
+            
+            // geometry 교체 (material은 유지)
+            obj.geometry = newGeometry;
+            oldGeometry.dispose();
+          }
+        });
+        // scale 업데이트
+        this.model.scale.setScalar(newScale);
+        this.modelOptions = { ...opts };
+        return this.model;
+      }
+
+      // scale만 변경된 경우: scale만 업데이트
+      if (!textureChanged && !geometryChanged && oldScale !== newScale) {
         this.model.scale.setScalar(newScale);
         this.modelOptions = { ...opts };
         return this.model;
       }
     }
 
-    // shape가 변경되었거나 다른 옵션이 변경된 경우: 새로 생성
+    // shape가 변경되었거나 텍스처가 변경된 경우: 새로 생성
     if (this.model) {
       this.scene.remove(this.model);
       this.model.traverse((obj) => {
         if (obj instanceof THREE.Mesh) {
           obj.geometry?.dispose();
-          if (obj.material instanceof THREE.Material) obj.material.dispose();
+          if (obj.material instanceof THREE.Material) {
+            if (obj.material instanceof THREE.MeshBasicMaterial && obj.material.map instanceof THREE.VideoTexture) {
+              const videoTexture = obj.material.map as THREE.VideoTexture;
+              const video = videoTexture.image as HTMLVideoElement;
+              if (video) {
+                video.pause();
+                video.src = '';
+                video.load();
+              }
+              videoTexture.dispose();
+            }
+            obj.material.dispose();
+          }
         }
       });
       this.model = null;
@@ -111,17 +165,29 @@ export class AscMosaic {
     this.scene.add(this.model);
     this.modelOptions = { ...opts };
 
-    // GLB 모델의 경우 bounding box를 계산하여 카메라 위치 조정
-    if (opts.shape === 'glb' && this.model) {
+    // 모델의 bounding box를 계산하여 카메라 위치 조정
+    if (this.model) {
       const box = new THREE.Box3().setFromObject(this.model);
       if (!box.isEmpty()) {
         const size = box.getSize(new THREE.Vector3());
         const center = box.getCenter(new THREE.Vector3());
         const maxDim = Math.max(size.x, size.y, size.z);
-        // 모델이 작으면 최소 거리 보장, 크면 모델 크기의 3배 거리
-        const distance = Math.max(maxDim * 3, 5);
         
-        this.camera.position.set(center.x, center.y, center.z + distance);
+        // 평면의 경우 높이를 고려하여 거리 계산
+        let distance: number;
+        if (opts.shape === 'plane') {
+          // 평면은 주로 XY 평면이므로 Z축 방향에서 봐야 함
+          // 평면의 대각선 길이를 기준으로 거리 계산
+          const diagonal = Math.sqrt(size.x * size.x + size.y * size.y);
+          distance = Math.max(diagonal * 1.5, 5);
+          // Z축 방향에서 약간 위에서 보도록
+          this.camera.position.set(center.x, center.y + distance * 0.3, center.z + distance);
+        } else {
+          // 구, 큐브, GLB의 경우
+          distance = Math.max(maxDim * 3, 5);
+          this.camera.position.set(center.x, center.y, center.z + distance);
+        }
+        
         this.camera.lookAt(center);
         this.camera.updateProjectionMatrix();
       } else {
@@ -547,7 +613,19 @@ export class AscMosaic {
       this.model.traverse((obj) => {
         if (obj instanceof THREE.Mesh) {
           obj.geometry?.dispose();
-          if (obj.material instanceof THREE.Material) obj.material.dispose();
+          if (obj.material instanceof THREE.Material) {
+            if (obj.material instanceof THREE.MeshBasicMaterial && obj.material.map instanceof THREE.VideoTexture) {
+              const videoTexture = obj.material.map as THREE.VideoTexture;
+              const video = videoTexture.image as HTMLVideoElement;
+              if (video) {
+                video.pause();
+                video.src = '';
+                video.load();
+              }
+              videoTexture.dispose();
+            }
+            obj.material.dispose();
+          }
         }
       });
     }

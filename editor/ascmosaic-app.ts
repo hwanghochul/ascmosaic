@@ -18,6 +18,7 @@ declare global {
       mosaicSize?: number;
       mosaicCellTextureUrl?: string;
       textureUrl?: string;
+      textureType?: 'image' | 'video';
       cellCount?: number;
       setCount?: number;
       setSelectionMode?: 'first' | 'random' | 'cycle';
@@ -57,6 +58,7 @@ interface InstanceConfig {
   mosaicSize?: number;
   mosaicCellTextureUrl?: string;
   textureUrl?: string;
+  textureType?: 'image' | 'video';
   cellCount?: number;
   setCount?: number;
   setSelectionMode?: 'first' | 'random' | 'cycle';
@@ -107,6 +109,7 @@ async function initContainer(container: HTMLElement): Promise<AscMosaic | null> 
     if (config.modelUrl) earthOptions.modelUrl = resolveTextureUrl(config.modelUrl);
   } else {
     earthOptions.textureUrl = resolveTextureUrl(config.textureUrl ?? '/resource/earth.jpg');
+    if (config.textureType) earthOptions.textureType = config.textureType;
     if (shape === 'sphere') {
       earthOptions.radius = config.radius ?? 2;
       earthOptions.widthSegments = 64;

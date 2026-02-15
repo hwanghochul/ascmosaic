@@ -87,6 +87,7 @@ function loadStateFromURL(): boolean {
     if (state.modelUrl !== undefined) currentModelUrl = state.modelUrl;
     if (state.scale !== undefined) currentScale = state.scale;
     if (state.textureUrl !== undefined) currentEarthTextureUrl = state.textureUrl;
+    if (state.textureType !== undefined) currentTextureType = state.textureType;
     if (state.controlMode !== undefined) currentControlMode = state.controlMode;
     if (state.tiltInvertX !== undefined) currentTiltInvertX = state.tiltInvertX;
     if (state.tiltInvertY !== undefined) currentTiltInvertY = state.tiltInvertY;
@@ -112,6 +113,7 @@ function saveStateToURL(): void {
     cellUrl: currentCellUrl,
     setCount: currentSetCount,
     setSelectionMode: currentSetSelectionMode,
+    textureType: currentTextureType,
     shape: currentShape,
     radius: currentRadius,
     cubeSize: currentCubeSize,
@@ -182,6 +184,7 @@ function animate() {
 interface ResourceList {
   cells: string[];
   textures: string[];
+  video_textures?: string[];
   models?: string[];
 }
 
@@ -208,6 +211,7 @@ let currentTiltMaxAngle = 30; // 도 단위
 let currentTiltSmoothness = 0.15;
 let currentSetCount = 1;
 let currentSetSelectionMode: 'first' | 'random' | 'cycle' = 'first';
+let currentTextureType: 'image' | 'video' = 'image';
 
 function getMosaicFilterOptions() {
   return {
@@ -222,7 +226,7 @@ function getMosaicFilterOptions() {
   };
 }
 
-function getEarthOptions() {
+function getModelOptions() {
   const base: Record<string, unknown> = {
     shape: currentShape,
     scale: currentScale,
@@ -231,6 +235,7 @@ function getEarthOptions() {
     base.modelUrl = currentModelUrl || undefined;
   } else {
     base.textureUrl = currentEarthTextureUrl;
+    base.textureType = currentTextureType;
     if (currentShape === 'sphere') {
       base.radius = currentRadius;
       base.widthSegments = 64;
@@ -245,8 +250,8 @@ function getEarthOptions() {
   return base;
 }
 
-async function applyEarth() {
-  await mosaic.addModel(getEarthOptions());
+async function applyModel() {
+  await mosaic.addModel(getModelOptions());
 }
 
 function showShapeParams(shape: ShapeType) {
@@ -381,7 +386,7 @@ cellSelect.addEventListener('change', async () => {
 shapeSelect.addEventListener('change', async () => {
   currentShape = shapeSelect.value as ShapeType;
   showShapeParams(currentShape);
-  await applyEarth();
+  await applyModel();
   updateHTMLCodeIfRealtime();
 });
 
@@ -389,7 +394,7 @@ shapeSelect.addEventListener('change', async () => {
 sphereRadiusSlider.addEventListener('input', async () => {
   currentRadius = parseFloat(sphereRadiusSlider.value);
   sphereRadiusValue.textContent = currentRadius.toFixed(1);
-  await applyEarth();
+  await applyModel();
   updateHTMLCodeIfRealtime();
 });
 
@@ -397,7 +402,7 @@ sphereRadiusSlider.addEventListener('input', async () => {
 cubeSizeSlider.addEventListener('input', async () => {
   currentCubeSize = parseFloat(cubeSizeSlider.value);
   cubeSizeValue.textContent = currentCubeSize.toFixed(1);
-  await applyEarth();
+  await applyModel();
   updateHTMLCodeIfRealtime();
 });
 
@@ -405,13 +410,13 @@ cubeSizeSlider.addEventListener('input', async () => {
 planeWidthSlider.addEventListener('input', async () => {
   currentPlaneWidth = parseFloat(planeWidthSlider.value);
   planeWidthValue.textContent = currentPlaneWidth.toFixed(1);
-  await applyEarth();
+  await applyModel();
   updateHTMLCodeIfRealtime();
 });
 planeHeightSlider.addEventListener('input', async () => {
   currentPlaneHeight = parseFloat(planeHeightSlider.value);
   planeHeightValue.textContent = currentPlaneHeight.toFixed(1);
-  await applyEarth();
+  await applyModel();
   updateHTMLCodeIfRealtime();
 });
 
@@ -419,14 +424,14 @@ planeHeightSlider.addEventListener('input', async () => {
 scaleSlider.addEventListener('input', async () => {
   currentScale = parseFloat(scaleSlider.value);
   scaleValue.textContent = currentScale.toFixed(1);
-  await applyEarth();
+  await applyModel();
   updateHTMLCodeIfRealtime();
 });
 
 // GLB 모델 선택 이벤트
 modelSelect.addEventListener('change', async () => {
   currentModelUrl = modelSelect.value;
-  await applyEarth();
+  await applyModel();
   updateHTMLCodeIfRealtime();
 });
 
@@ -435,7 +440,10 @@ textureSelect.addEventListener('change', async () => {
   const value = textureSelect.value;
   if (!value) return;
   currentEarthTextureUrl = value;
-  await applyEarth();
+  const selectedOpt = textureSelect.options[textureSelect.selectedIndex];
+  const type = selectedOpt?.getAttribute('data-texture-type');
+  currentTextureType = type === 'video' ? 'video' : 'image';
+  await applyModel();
   updateHTMLCodeIfRealtime();
 });
 
@@ -545,6 +553,14 @@ function loadResourceList(): Promise<void> {
         const opt = document.createElement('option');
         opt.value = base + filename;
         opt.textContent = filename;
+        opt.setAttribute('data-texture-type', 'image');
+        textureSelect.appendChild(opt);
+      });
+      (list.video_textures ?? []).forEach((filename) => {
+        const opt = document.createElement('option');
+        opt.value = base + filename;
+        opt.textContent = `${filename} (비디오)`;
+        opt.setAttribute('data-texture-type', 'video');
         textureSelect.appendChild(opt);
       });
       modelSelect.innerHTML = '';
@@ -568,6 +584,8 @@ function loadResourceList(): Promise<void> {
         }
         if (currentEarthTextureUrl && textureSelect.querySelector(`option[value="${currentEarthTextureUrl}"]`)) {
           textureSelect.value = currentEarthTextureUrl;
+          const selOpt = textureSelect.options[textureSelect.selectedIndex];
+          currentTextureType = selOpt?.getAttribute('data-texture-type') === 'video' ? 'video' : 'image';
         }
         if (currentModelUrl && modelSelect.querySelector(`option[value="${currentModelUrl}"]`)) {
           modelSelect.value = currentModelUrl;
@@ -577,14 +595,14 @@ function loadResourceList(): Promise<void> {
       // URL에서 복원된 상태가 없을 때만 기본 적용
       if (!hasStateFromURL) {
         showShapeParams(currentShape);
-        await applyEarth();
+        await applyModel();
         updateHTMLCodeIfRealtime();
       }
     })
     .catch(async (err) => {
       console.warn('resource_list.json 로드 실패, 기본값 사용:', err);
       showShapeParams(currentShape);
-      await applyEarth();
+      await applyModel();
       updateHTMLCodeIfRealtime();
     });
 }
@@ -603,6 +621,7 @@ function generateHTMLCode(): string {
     mosaicSize: currentMosaicSize,
     mosaicCellTextureUrl: currentCellUrl,
     textureUrl: currentEarthTextureUrl,
+    textureType: currentTextureType,
     cellCount: currentCellCount,
     setCount: currentSetCount,
     setSelectionMode: currentSetSelectionMode,
@@ -790,6 +809,8 @@ function applyStateToUI(): void {
   scaleSlider.value = currentScale.toString();
   scaleValue.textContent = currentScale.toFixed(1);
   textureSelect.value = currentEarthTextureUrl;
+  const texOpt = textureSelect.options[textureSelect.selectedIndex];
+  currentTextureType = texOpt?.getAttribute('data-texture-type') === 'video' ? 'video' : 'image';
   controlModeSelect.value = currentControlMode;
   tiltInvertX.checked = currentTiltInvertX;
   tiltInvertY.checked = currentTiltInvertY;
@@ -816,7 +837,7 @@ loadResourceList().then(async () => {
   // URL에서 복원된 상태가 있으면 적용
   if (hasStateFromURL) {
     showShapeParams(currentShape);
-    await applyEarth();
+    await applyModel();
     
     // 컨트롤 모드 적용
     if (currentControlMode === 'orbit') {
@@ -862,7 +883,7 @@ loadResourceList().then(async () => {
   // 에러 발생 시에도 기본 상태로 시작
   if (!hasStateFromURL) {
     showShapeParams(currentShape);
-    await applyEarth();
+    await applyModel();
     updateHTMLCodeIfRealtime();
   }
   animate();
