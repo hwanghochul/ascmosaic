@@ -214,11 +214,27 @@ export class AscMosaic {
       this.orbitControls.dispose();
     }
 
+    // 모델이 있으면 모델의 중심을 타겟으로 설정
+    let target: THREE.Vector3 | undefined;
+    if (this.model) {
+      const box = new THREE.Box3().setFromObject(this.model);
+      if (!box.isEmpty()) {
+        const center = box.getCenter(new THREE.Vector3());
+        target = center;
+      }
+    }
+
+    // 옵션에 타겟 추가
+    const orbitOptions: OrbitControlsOptions = {
+      ...options,
+      target: target || options?.target,
+    };
+
     // 새 컨트롤 생성
     this.orbitControls = new OrbitControls(
       this.camera,
       this.renderer.domElement,
-      options
+      orbitOptions
     );
 
     return this.orbitControls;

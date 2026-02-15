@@ -20,8 +20,10 @@ export interface OrbitControlsOptions {
   autoRotate?: boolean;
   /** 자동 회전 속도 */
   autoRotateSpeed?: number;
-  /** 초기 수평 각도 (라디안, 기본값: Math.PI / 2 = 90도) */
+  /** 초기 수평 각도 (라디안, 기본값: 카메라 위치에서 계산) */
   initialTheta?: number;
+  /** 타겟 위치 (기본값: 카메라가 보고 있는 지점 추정) */
+  target?: THREE.Vector3;
 }
 
 /**
@@ -64,7 +66,27 @@ export class OrbitControls {
   ) {
     this.camera = camera;
     this.domElement = domElement;
-    this.target = new THREE.Vector3(0, 0, 0);
+    
+    // 타겟 설정 (옵션이 있으면 사용, 없으면 카메라가 보고 있는 지점 추정)
+    if (options.target) {
+      this.target = options.target.clone();
+    } else {
+      // 카메라가 보고 있는 지점을 타겟으로 추정
+      // 카메라의 방향 벡터를 사용하여 lookAt 지점 계산
+      const cameraDirection = new THREE.Vector3();
+      this.camera.getWorldDirection(cameraDirection);
+      
+      // 카메라 위치에서 앞쪽으로 거리만큼 떨어진 지점을 타겟으로 설정
+      // 거리는 카메라 위치의 길이 또는 기본값 사용
+      const cameraDistance = this.camera.position.length();
+      const estimatedLookAtDistance = cameraDistance > 0.1 ? cameraDistance : 5;
+      
+      const estimatedTarget = new THREE.Vector3()
+        .copy(this.camera.position)
+        .add(cameraDirection.multiplyScalar(estimatedLookAtDistance));
+      
+      this.target = estimatedTarget;
+    }
 
     // 옵션 설정
     this.minDistance = options.minDistance ?? 2;
@@ -77,13 +99,28 @@ export class OrbitControls {
     this.autoRotateSpeed = options.autoRotateSpeed ?? 1.0;
 
     // 초기 카메라 위치에서 각도 계산
+    const cameraToTarget = new THREE.Vector3().subVectors(this.target, this.camera.position);
+    this.distance = cameraToTarget.length();
+    
+    // 거리가 너무 작으면 기본값 사용
+    if (this.distance < 0.001) {
+      this.distance = this.camera.position.length() || 5;
+    }
+    
+    // 현재 카메라 위치에서 타겟으로의 방향 벡터 계산
     const direction = new THREE.Vector3()
       .subVectors(this.camera.position, this.target)
       .normalize();
-    this.distance = this.camera.position.distanceTo(this.target);
-    // 초기 수평 각도 설정 (옵션이 있으면 사용, 없으면 기본값 90도)
-    this.theta = options.initialTheta ?? Math.PI / 2;
-    this.phi = Math.acos(direction.y);
+    
+    // 수평 각도 (theta): XZ 평면에서의 각도
+    // atan2(x, z)를 사용하여 -π ~ π 범위의 각도 계산
+    const calculatedTheta = Math.atan2(direction.x, direction.z);
+    this.theta = options.initialTheta !== undefined ? options.initialTheta : calculatedTheta;
+    
+    // 수직 각도 (phi): Y축과의 각도 (0 = 위, π = 아래)
+    // direction.y가 -1 ~ 1 범위에 있도록 클램프
+    const clampedY = Math.max(-1, Math.min(1, direction.y));
+    this.phi = Math.acos(clampedY);
 
     // 이벤트 핸들러 바인딩
     this.onMouseDownHandler = this.onMouseDown.bind(this);
@@ -98,8 +135,9 @@ export class OrbitControls {
     this.domElement.addEventListener('mouseleave', this.onMouseUpHandler);
     this.domElement.addEventListener('wheel', this.onWheelHandler);
 
-    // 초기 카메라 위치 업데이트
-    this.updateCamera();
+    // 초기 카메라 위치는 그대로 유지
+    // 각도만 계산하여 저장하고, 사용자가 조작할 때만 카메라 위치 업데이트
+    // updateCamera()를 호출하지 않음으로써 현재 카메라 위치가 변경되지 않도록 함
   }
 
   /**
