@@ -62,6 +62,14 @@ npm run build
 - `dist/index.html` - 에디터 HTML
 - `dist/ascmosaic-app.js` - 스니펫 앱 진입점
 
+### 로컬서버에서 실행하기
+
+```bash
+npx serve dist
+```
+빌드후 로컬 서버를 실행한후 브라우져를 통해 다음위치로 접속합니다
+http://localhost:3000
+
 ### 개발 모드
 
 에디터를 개발 모드로 실행합니다:
