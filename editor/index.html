@@ -385,6 +385,20 @@
           <label for="cell-select">셀 선택</label>
           <select id="cell-select" class="combo-select"></select>
         </div>
+        <div class="control-row" id="avoid-container" style="display: none;">
+          <label for="avoid-checkbox">회피하기</label>
+          <input type="checkbox" id="avoid-checkbox">
+        </div>
+        <div class="control-row" id="avoid-radius-container" style="display: none;">
+          <label for="avoid-radius-slider">마우스 영향 범위</label>
+          <input type="range" id="avoid-radius-slider" min="20" max="200" value="80" step="1">
+          <span class="slider-value" id="avoid-radius-value">80</span>
+        </div>
+        <div class="control-row" id="avoid-strength-container" style="display: none;">
+          <label for="avoid-strength-slider">이동 강도</label>
+          <input type="range" id="avoid-strength-slider" min="5" max="50" value="15" step="1">
+          <span class="slider-value" id="avoid-strength-value">0.15</span>
+        </div>
       </div>
     </div>
 

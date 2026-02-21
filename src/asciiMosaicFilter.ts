@@ -30,6 +30,12 @@ export interface AsciiMosaicFilterOptions {
   setCount?: number;
   /** 세트 선택 모드 (기본값: 'first') */
   setSelectionMode?: 'first' | 'random' | 'cycle';
+  /** 회피하기: 셀이 마우스를 피해 이동 (기본값: false) */
+  avoid?: boolean;
+  /** 마우스 영향 범위(픽셀) (기본값: 80) */
+  avoidRadius?: number;
+  /** 이동 강도 (기본값: 0.15) */
+  avoidStrength?: number;
 }
 
 /**
@@ -58,18 +64,41 @@ export class AsciiMosaicFilter {
   private instanceCount: number = 0;
   private maxInstanceCount: number = 0;
   private instanceSampleUVs: Float32Array | null = null;
+  private instanceCenterNDCs: Float32Array | null = null;
   private planeGeometry: THREE.PlaneGeometry | null = null;
+  private avoid: boolean;
+  private avoidRadius: number;
+  private avoidStrength: number;
+  private mouseX: number = -10000;
+  private mouseY: number = -10000;
+  private mouseMoveBound: ((e: MouseEvent) => void) | null = null;
 
   private static readonly VERTEX_SHADER = `
     attribute vec2 instanceSampleUV;
+    attribute vec2 instanceCenterNDC;
     varying vec2 vSampleUV;
     varying vec2 vLocalUV;
+    
+    uniform vec2 uMouse;
+    uniform float uAvoidEnabled;
+    uniform float uAvoidRadius;
+    uniform float uAvoidStrength;
     
     void main() {
       vSampleUV = instanceSampleUV;
       vLocalUV = uv;
       vec4 mvPosition = modelViewMatrix * instanceMatrix * vec4(position, 1.0);
       gl_Position = projectionMatrix * mvPosition;
+      
+      vec2 toMouse = uMouse - instanceCenterNDC;
+      float dist = length(toMouse);
+      vec2 offset = vec2(0.0);
+      if (uAvoidEnabled > 0.5 && uAvoidRadius > 0.0 && dist < uAvoidRadius && dist > 0.001) {
+        vec2 dir = normalize(toMouse);
+        float push = (1.0 - dist / uAvoidRadius) * uAvoidStrength;
+        offset = -dir * push;
+      }
+      gl_Position.xy += offset;
     }
   `;
 
@@ -163,6 +192,9 @@ export class AsciiMosaicFilter {
     this.noiseFPS = options.noiseFPS ?? 15;
     this.setCount = Math.max(1, options.setCount ?? 1);
     this.setSelectionMode = options.setSelectionMode ?? 'first';
+    this.avoid = options.avoid ?? false;
+    this.avoidRadius = Math.max(0, options.avoidRadius ?? 80);
+    this.avoidStrength = Math.max(0, options.avoidStrength ?? 0.15);
     this.lastNoiseUpdateTime = performance.now();
 
     if (options.backgroundColor instanceof THREE.Color) {
@@ -186,6 +218,7 @@ export class AsciiMosaicFilter {
     this.initAtlas(options).then(() => {
       this.buildInstancedMesh(width, height);
     });
+    
   }
 
   private async initAtlas(
@@ -221,6 +254,7 @@ export class AsciiMosaicFilter {
 
     this.planeGeometry = new THREE.PlaneGeometry(1, 1);
     this.instanceSampleUVs = new Float32Array(this.maxInstanceCount * 2);
+    this.instanceCenterNDCs = new Float32Array(this.maxInstanceCount * 2);
 
     const cols = Math.ceil(w / size);
     const rows = Math.ceil(h / size);
@@ -231,6 +265,8 @@ export class AsciiMosaicFilter {
         const centerY = (j * size + 0.5 * size) / h;
         this.instanceSampleUVs![idx * 2] = centerX;
         this.instanceSampleUVs![idx * 2 + 1] = centerY;
+        this.instanceCenterNDCs![idx * 2] = centerX * 2 - 1;
+        this.instanceCenterNDCs![idx * 2 + 1] = centerY * 2 - 1;
       }
     }
 
@@ -247,16 +283,24 @@ export class AsciiMosaicFilter {
         uBackgroundColor: { value: this.backgroundColor },
         uNoiseIntensity: { value: this.noiseIntensity },
         uTime: { value: this.time },
+        uMouse: { value: new THREE.Vector2(this.mouseX, this.mouseY) },
+        uAvoidEnabled: { value: this.avoid ? 1 : 0 },
+        uAvoidRadius: { value: (this.avoidRadius / Math.min(w, h)) * 2 },
+        uAvoidStrength: { value: this.avoidStrength },
       },
       vertexShader: AsciiMosaicFilter.VERTEX_SHADER,
       fragmentShader: AsciiMosaicFilter.FRAGMENT_SHADER,
       transparent: true,
+      wireframe: true, // 디버깅: 셀 경계 표시
     });
 
     const geometry = this.planeGeometry.clone();
     const sampleUVAttr = new THREE.InstancedBufferAttribute(this.instanceSampleUVs!, 2);
     (sampleUVAttr as THREE.BufferAttribute).usage = THREE.DynamicDrawUsage;
     geometry.setAttribute('instanceSampleUV', sampleUVAttr);
+    const centerNDCAttr = new THREE.InstancedBufferAttribute(this.instanceCenterNDCs!, 2);
+    (centerNDCAttr as THREE.BufferAttribute).usage = THREE.DynamicDrawUsage;
+    geometry.setAttribute('instanceCenterNDC', centerNDCAttr);
 
     this.instancedMesh = new THREE.InstancedMesh(geometry, this.material, this.maxInstanceCount);
     this.instancedMesh.count = this.instanceCount;
@@ -280,15 +324,23 @@ export class AsciiMosaicFilter {
         const idx = j * cols + i;
         const centerX = (i * size + 0.5 * size) / w;
         const centerY = (j * size + 0.5 * size) / h;
-        position.x = centerX * 2 - 1;
-        position.y = centerY * 2 - 1; // 텍스처 하단(centerY=0)=화면 하단(NDC -1), 상단(centerY=1)=화면 상단(NDC 1)
+        const ndcX = centerX * 2 - 1;
+        const ndcY = centerY * 2 - 1;
+        position.x = ndcX;
+        position.y = ndcY;
         position.z = 0;
         quat.identity();
         matrix.compose(position, quat, scale);
         this.instancedMesh.setMatrixAt(idx, matrix);
+        if (this.instanceCenterNDCs) {
+          this.instanceCenterNDCs[idx * 2] = ndcX;
+          this.instanceCenterNDCs[idx * 2 + 1] = ndcY;
+        }
       }
     }
     this.instancedMesh.instanceMatrix.needsUpdate = true;
+    const centerAttr = this.instancedMesh.geometry.attributes.instanceCenterNDC as THREE.InstancedBufferAttribute | undefined;
+    if (centerAttr) centerAttr.needsUpdate = true;
   }
 
   private updateInstanceSampleUVs(w: number, h: number, size: number): void {
@@ -306,6 +358,28 @@ export class AsciiMosaicFilter {
     }
     const attr = this.instancedMesh.geometry.attributes.instanceSampleUV as THREE.InstancedBufferAttribute;
     if (attr) attr.needsUpdate = true;
+  }
+
+  private updateMousePosition(e: MouseEvent): void {
+    const el = this.renderer.domElement;
+    const rect = el.getBoundingClientRect();
+    const w = el.width;
+    const h = el.height;
+    if (w <= 0 || h <= 0) return;
+    this.mouseX = ((e.clientX - rect.left) / rect.width) * w;
+    this.mouseY = ((e.clientY - rect.top) / rect.height) * h;
+  }
+
+  private attachMouseListener(): void {
+    if (this.mouseMoveBound !== null) return;
+    this.mouseMoveBound = (e: MouseEvent) => this.updateMousePosition(e);
+    this.renderer.domElement.addEventListener('mousemove', this.mouseMoveBound);
+  }
+
+  private detachMouseListener(): void {
+    if (this.mouseMoveBound === null) return;
+    this.renderer.domElement.removeEventListener('mousemove', this.mouseMoveBound);
+    this.mouseMoveBound = null;
   }
 
   renderToTarget(scene: THREE.Scene, camera: THREE.Camera): void {
@@ -333,6 +407,12 @@ export class AsciiMosaicFilter {
     this.material.uniforms.uSetCount.value = this.setCount;
     this.material.uniforms.uSetSelectionMode.value =
       this.setSelectionMode === 'first' ? 0 : this.setSelectionMode === 'random' ? 1 : 2;
+    const mouseNdcX = (this.mouseX / this.width) * 2 - 1;
+    const mouseNdcY = 1 - (this.mouseY / this.height) * 2;
+    this.material.uniforms.uMouse.value.set(mouseNdcX, mouseNdcY);
+    this.material.uniforms.uAvoidEnabled.value = this.avoid ? 1 : 0;
+    this.material.uniforms.uAvoidRadius.value = (this.avoidRadius / Math.min(this.width, this.height)) * 2;
+    this.material.uniforms.uAvoidStrength.value = this.avoidStrength;
 
     this.renderer.render(this.scene, this.camera);
   }
@@ -363,6 +443,7 @@ export class AsciiMosaicFilter {
       this.maxInstanceCount = newCount;
       const oldGeo = this.instancedMesh.geometry;
       this.instanceSampleUVs = new Float32Array(this.maxInstanceCount * 2);
+      this.instanceCenterNDCs = new Float32Array(this.maxInstanceCount * 2);
       const cols = Math.ceil(w / size);
       const rows = Math.ceil(h / size);
       for (let j = 0; j < rows; j++) {
@@ -372,12 +453,17 @@ export class AsciiMosaicFilter {
           const centerY = (j * size + 0.5 * size) / h;
           this.instanceSampleUVs[idx * 2] = centerX;
           this.instanceSampleUVs[idx * 2 + 1] = centerY;
+          this.instanceCenterNDCs[idx * 2] = centerX * 2 - 1;
+          this.instanceCenterNDCs[idx * 2 + 1] = centerY * 2 - 1;
         }
       }
       const newGeometry = this.planeGeometry!.clone();
       const newSampleUVAttr = new THREE.InstancedBufferAttribute(this.instanceSampleUVs, 2);
       (newSampleUVAttr as THREE.BufferAttribute).usage = THREE.DynamicDrawUsage;
       newGeometry.setAttribute('instanceSampleUV', newSampleUVAttr);
+      const newCenterNDCAttr = new THREE.InstancedBufferAttribute(this.instanceCenterNDCs, 2);
+      (newCenterNDCAttr as THREE.BufferAttribute).usage = THREE.DynamicDrawUsage;
+      newGeometry.setAttribute('instanceCenterNDC', newCenterNDCAttr);
       this.instancedMesh.geometry = newGeometry;
       oldGeo.dispose();
     } else {
@@ -428,15 +514,42 @@ export class AsciiMosaicFilter {
     }
   }
 
+  setAvoid(enabled: boolean): void {
+    this.avoid = enabled;
+    if (this.material) {
+      this.material.uniforms.uAvoidEnabled.value = enabled ? 1 : 0;
+    }
+    if (this.isEnabled) {
+      if (enabled) this.attachMouseListener();
+      else this.detachMouseListener();
+    }
+  }
+
+  setAvoidRadius(radius: number): void {
+    this.avoidRadius = Math.max(0, radius);
+    if (this.material) {
+      this.material.uniforms.uAvoidRadius.value = (this.avoidRadius / Math.min(this.width, this.height)) * 2;
+    }
+  }
+
+  setAvoidStrength(strength: number): void {
+    this.avoidStrength = Math.max(0, strength);
+    if (this.material) {
+      this.material.uniforms.uAvoidStrength.value = this.avoidStrength;
+    }
+  }
+
   getRenderTarget(): THREE.WebGLRenderTarget {
     return this.renderTarget;
   }
 
   enable(): void {
     this.isEnabled = true;
+    if (this.avoid) this.attachMouseListener();
   }
 
   disable(): void {
+    this.detachMouseListener();
     this.isEnabled = false;
   }
 
@@ -445,6 +558,7 @@ export class AsciiMosaicFilter {
   }
 
   dispose(): void {
+    this.detachMouseListener();
     if (this.instancedMesh) {
       this.instancedMesh.geometry.dispose();
       if (this.instancedMesh.material instanceof THREE.Material) {
