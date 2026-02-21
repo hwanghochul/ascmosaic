@@ -299,8 +299,8 @@ asciiToggleBtn.addEventListener('click', async () => {
       cellSelectContainer.style.display = 'flex';
       setConfigContainer.style.display = 'block';
       avoidContainer.style.display = 'flex';
-      avoidRadiusContainer.style.display = 'flex';
-      avoidStrengthContainer.style.display = 'flex';
+      avoidRadiusContainer.style.display = currentAvoid ? 'flex' : 'none';
+      avoidStrengthContainer.style.display = currentAvoid ? 'flex' : 'none';
       setCountValue.textContent = String(currentSetCount);
       mosaic.setAvoid(currentAvoid);
       mosaic.setAvoidRadius(currentAvoidRadius);
@@ -398,9 +398,11 @@ setSelectionModeSelect.addEventListener('change', () => {
   updateHTMLCodeIfRealtime();
 });
 
-// 회피하기 체크박스 이벤트
+// 회피하기 체크박스 이벤트 (켜질 때만 서브 설정 UI 표시)
 avoidCheckbox.addEventListener('change', () => {
   currentAvoid = avoidCheckbox.checked;
+  avoidRadiusContainer.style.display = currentAvoid ? 'flex' : 'none';
+  avoidStrengthContainer.style.display = currentAvoid ? 'flex' : 'none';
   if (mosaic.isAsciiMosaicFilterEnabled()) {
     mosaic.setAvoid(currentAvoid);
   }
@@ -697,9 +699,11 @@ function generateHTMLCode(): string {
   if (currentSetSelectionMode !== 'first') config.setSelectionMode = currentSetSelectionMode;
   if (currentNoiseIntensity !== 0) config.noiseIntensity = currentNoiseIntensity;
   if (currentNoiseFPS !== 10) config.noiseFPS = currentNoiseFPS;
-  if (currentAvoid) config.avoid = currentAvoid;
-  if (currentAvoidRadius !== 80) config.avoidRadius = currentAvoidRadius;
-  if (currentAvoidStrength !== 0.15) config.avoidStrength = currentAvoidStrength;
+  if (currentAvoid) {
+    config.avoid = true;
+    config.avoidRadius = currentAvoidRadius;
+    config.avoidStrength = currentAvoidStrength;
+  }
 
   // 카메라 위치/회전
   config.cameraPosition = {
@@ -960,8 +964,8 @@ loadResourceList().then(async () => {
       cellSelectContainer.style.display = 'flex';
       setConfigContainer.style.display = 'block';
       avoidContainer.style.display = 'flex';
-      avoidRadiusContainer.style.display = 'flex';
-      avoidStrengthContainer.style.display = 'flex';
+      avoidRadiusContainer.style.display = currentAvoid ? 'flex' : 'none';
+      avoidStrengthContainer.style.display = currentAvoid ? 'flex' : 'none';
       mosaic.setAvoid(currentAvoid);
       mosaic.setAvoidRadius(currentAvoidRadius);
       mosaic.setAvoidStrength(currentAvoidStrength);

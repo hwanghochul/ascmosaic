@@ -72,7 +72,13 @@ export class AsciiMosaicFilter {
   private avoidStrength: number;
   private mouseX: number = -10000;
   private mouseY: number = -10000;
+  private mouseIsInside: boolean = false;
+  /** 화면 출입 시 갑작스러운 변화 방지용 보간된 이동 강도 (0 ~ avoidStrength) */
+  private effectiveAvoidStrength: number = 0;
+  private lastRenderTime: number = 0;
   private mouseMoveBound: ((e: MouseEvent) => void) | null = null;
+  private mouseLeaveBound: (() => void) | null = null;
+  private mouseEnterBound: (() => void) | null = null;
 
   private static readonly VERTEX_SHADER = `
     attribute vec2 instanceSampleUV;
@@ -100,6 +106,8 @@ export class AsciiMosaicFilter {
         offset = -dir * push;
       }
       gl_Position.xy += offset;
+      // 중심에서 많이 움직일수록 카메라에 가깝게 (z를 당겨서 앞에 그리기)
+      // gl_Position.z = -length(offset) * 0.0001;
     }
   `;
 
@@ -281,7 +289,7 @@ export class AsciiMosaicFilter {
       vertexShader: AsciiMosaicFilter.VERTEX_SHADER,
       fragmentShader: AsciiMosaicFilter.FRAGMENT_SHADER,
       transparent: true,
-      // depthWrite: false,
+      depthWrite: false,
       // depthTest: true,
       // wireframe: true, // 디버깅: 셀 경계 표시
     });
@@ -302,6 +310,7 @@ export class AsciiMosaicFilter {
   }
 
   private updateInstanceMatrices(w: number, h: number, size: number): void {
+    
     if (!this.instancedMesh) return;
     const cols = Math.ceil(w / size);
     const rows = Math.ceil(h / size);
@@ -358,20 +367,36 @@ export class AsciiMosaicFilter {
     const w = el.width;
     const h = el.height;
     if (w <= 0 || h <= 0) return;
+    this.mouseIsInside = true;
     this.mouseX = ((e.clientX - rect.left) / rect.width) * w;
     this.mouseY = ((e.clientY - rect.top) / rect.height) * h;
   }
 
   private attachMouseListener(): void {
     if (this.mouseMoveBound !== null) return;
+    const el = this.renderer.domElement;
     this.mouseMoveBound = (e: MouseEvent) => this.updateMousePosition(e);
-    this.renderer.domElement.addEventListener('mousemove', this.mouseMoveBound);
+    this.mouseLeaveBound = () => { this.mouseIsInside = false; };
+    this.mouseEnterBound = () => { this.mouseIsInside = true; };
+    el.addEventListener('mousemove', this.mouseMoveBound);
+    el.addEventListener('mouseleave', this.mouseLeaveBound);
+    el.addEventListener('mouseenter', this.mouseEnterBound);
   }
 
   private detachMouseListener(): void {
-    if (this.mouseMoveBound === null) return;
-    this.renderer.domElement.removeEventListener('mousemove', this.mouseMoveBound);
-    this.mouseMoveBound = null;
+    const el = this.renderer.domElement;
+    if (this.mouseMoveBound !== null) {
+      el.removeEventListener('mousemove', this.mouseMoveBound);
+      this.mouseMoveBound = null;
+    }
+    if (this.mouseLeaveBound !== null) {
+      el.removeEventListener('mouseleave', this.mouseLeaveBound);
+      this.mouseLeaveBound = null;
+    }
+    if (this.mouseEnterBound !== null) {
+      el.removeEventListener('mouseenter', this.mouseEnterBound);
+      this.mouseEnterBound = null;
+    }
   }
 
   renderToTarget(scene: THREE.Scene, camera: THREE.Camera): void {
@@ -404,7 +429,14 @@ export class AsciiMosaicFilter {
     this.material.uniforms.uMouse.value.set(mouseNdcX, mouseNdcY);
     this.material.uniforms.uAvoidEnabled.value = this.avoid ? 1 : 0;
     this.material.uniforms.uAvoidRadius.value = (this.avoidRadius / Math.min(this.width, this.height)) * 2;
-    this.material.uniforms.uAvoidStrength.value = this.avoidStrength;
+
+    const now = performance.now();
+    const deltaSec = this.lastRenderTime > 0 ? (now - this.lastRenderTime) / 1000 : 0.016;
+    this.lastRenderTime = now;
+    const targetStrength = this.avoid && this.mouseIsInside ? this.avoidStrength : 0;
+    const lerpSpeed = 6.0;
+    this.effectiveAvoidStrength += (targetStrength - this.effectiveAvoidStrength) * Math.min(1, deltaSec * lerpSpeed);
+    this.material.uniforms.uAvoidStrength.value = this.effectiveAvoidStrength;
 
     this.renderer.render(this.scene, this.camera);
   }
@@ -433,7 +465,6 @@ export class AsciiMosaicFilter {
 
     if (newCount > this.maxInstanceCount) {
       this.maxInstanceCount = newCount;
-      const oldGeo = this.instancedMesh.geometry;
       this.instanceSampleUVs = new Float32Array(this.maxInstanceCount * 2);
       this.instanceCenterNDCs = new Float32Array(this.maxInstanceCount * 2);
       const cols = Math.ceil(w / size);
@@ -456,8 +487,12 @@ export class AsciiMosaicFilter {
       const newCenterNDCAttr = new THREE.InstancedBufferAttribute(this.instanceCenterNDCs, 2);
       (newCenterNDCAttr as THREE.BufferAttribute).usage = THREE.DynamicDrawUsage;
       newGeometry.setAttribute('instanceCenterNDC', newCenterNDCAttr);
-      this.instancedMesh.geometry = newGeometry;
-      oldGeo.dispose();
+
+      this.scene.remove(this.instancedMesh);
+      this.instancedMesh.geometry.dispose();
+      this.instancedMesh = new THREE.InstancedMesh(newGeometry, this.material!, this.maxInstanceCount);
+      this.instancedMesh.frustumCulled = false;
+      this.scene.add(this.instancedMesh);
     } else {
       this.updateInstanceSampleUVs(w, h, size);
     }
