@@ -378,7 +378,13 @@
               <option value="first">첫번째만</option>
               <option value="random">랜덤</option>
               <option value="cycle">순회</option>
+              <option value="offsetRow">세트변경</option>
             </select>
+          </div>
+          <div class="control-row" id="offset-row-radius-container" style="display: none;">
+            <label for="offset-row-radius-slider">세트변경 마우스 영향 범위</label>
+            <input type="range" id="offset-row-radius-slider" min="20" max="200" value="80" step="1">
+            <span class="slider-value" id="offset-row-radius-value">80</span>
           </div>
         </div>
         <div class="control-row" id="cell-select-container" style="display: none;">

@@ -48,6 +48,9 @@ const setConfigContainer = document.getElementById('set-config-container')!;
 const setCountSlider = document.getElementById('set-count-slider')! as HTMLInputElement;
 const setCountValue = document.getElementById('set-count-value')!;
 const setSelectionModeSelect = document.getElementById('set-selection-mode-select')! as HTMLSelectElement;
+const offsetRowRadiusContainer = document.getElementById('offset-row-radius-container')!;
+const offsetRowRadiusSlider = document.getElementById('offset-row-radius-slider')! as HTMLInputElement;
+const offsetRowRadiusValue = document.getElementById('offset-row-radius-value')!;
 const avoidContainer = document.getElementById('avoid-container')!;
 const avoidCheckbox = document.getElementById('avoid-checkbox')! as HTMLInputElement;
 const avoidRadiusContainer = document.getElementById('avoid-radius-container')!;
@@ -87,6 +90,7 @@ function loadStateFromURL(): boolean {
     if (state.cellUrl !== undefined) currentCellUrl = state.cellUrl;
     if (state.setCount !== undefined) currentSetCount = state.setCount;
     if (state.setSelectionMode !== undefined) currentSetSelectionMode = state.setSelectionMode;
+    if (state.offsetRowRadius !== undefined) currentOffsetRowRadius = state.offsetRowRadius;
     if (state.avoid !== undefined) currentAvoid = state.avoid;
     if (state.avoidRadius !== undefined) currentAvoidRadius = state.avoidRadius;
     if (state.avoidStrength !== undefined) currentAvoidStrength = state.avoidStrength;
@@ -124,6 +128,7 @@ function saveStateToURL(): void {
     cellUrl: currentCellUrl,
     setCount: currentSetCount,
     setSelectionMode: currentSetSelectionMode,
+    offsetRowRadius: currentOffsetRowRadius,
     avoid: currentAvoid,
     avoidRadius: currentAvoidRadius,
     avoidStrength: currentAvoidStrength,
@@ -224,7 +229,8 @@ let currentTiltInvertY = false;
 let currentTiltMaxAngle = 30; // 도 단위
 let currentTiltSmoothness = 0.15;
 let currentSetCount = 1;
-let currentSetSelectionMode: 'first' | 'random' | 'cycle' = 'first';
+let currentSetSelectionMode: 'first' | 'random' | 'cycle' | 'offsetRow' = 'first';
+let currentOffsetRowRadius = 80;
 let currentAvoid = false;
 let currentAvoidRadius = 80;
 let currentAvoidStrength = 0.15;
@@ -239,6 +245,7 @@ function getMosaicFilterOptions() {
     noiseFPS: currentNoiseFPS,
     setCount: currentSetCount,
     setSelectionMode: currentSetSelectionMode,
+    offsetRowRadius: currentOffsetRowRadius,
     avoid: currentAvoid,
     avoidRadius: currentAvoidRadius,
     avoidStrength: currentAvoidStrength,
@@ -301,7 +308,10 @@ asciiToggleBtn.addEventListener('click', async () => {
       avoidContainer.style.display = 'flex';
       avoidRadiusContainer.style.display = currentAvoid ? 'flex' : 'none';
       avoidStrengthContainer.style.display = currentAvoid ? 'flex' : 'none';
+      offsetRowRadiusContainer.style.display = currentSetSelectionMode === 'offsetRow' ? 'flex' : 'none';
       setCountValue.textContent = String(currentSetCount);
+      mosaic.setSetSelectionMode(currentSetSelectionMode);
+      mosaic.setOffsetRowRadius(currentOffsetRowRadius);
       mosaic.setAvoid(currentAvoid);
       mosaic.setAvoidRadius(currentAvoidRadius);
       mosaic.setAvoidStrength(currentAvoidStrength);
@@ -391,9 +401,22 @@ setCountSlider.addEventListener('input', (e) => {
 
 // 세트 선택 모드 이벤트
 setSelectionModeSelect.addEventListener('change', () => {
-  currentSetSelectionMode = setSelectionModeSelect.value as 'first' | 'random' | 'cycle';
+  currentSetSelectionMode = setSelectionModeSelect.value as 'first' | 'random' | 'cycle' | 'offsetRow';
+  offsetRowRadiusContainer.style.display = currentSetSelectionMode === 'offsetRow' ? 'flex' : 'none';
   if (mosaic.isAsciiMosaicFilterEnabled()) {
     mosaic.setSetSelectionMode(currentSetSelectionMode);
+    mosaic.setOffsetRowRadius(currentOffsetRowRadius);
+  }
+  updateHTMLCodeIfRealtime();
+});
+
+// 세트변경 마우스 영향 범위 슬라이더 이벤트
+offsetRowRadiusSlider.addEventListener('input', (e) => {
+  const radius = parseInt((e.target as HTMLInputElement).value);
+  currentOffsetRowRadius = radius;
+  offsetRowRadiusValue.textContent = radius.toString();
+  if (mosaic.isAsciiMosaicFilterEnabled()) {
+    mosaic.setOffsetRowRadius(radius);
   }
   updateHTMLCodeIfRealtime();
 });
@@ -697,6 +720,7 @@ function generateHTMLCode(): string {
   if (currentCellCount !== 6) config.cellCount = currentCellCount;
   if (currentSetCount !== 1) config.setCount = currentSetCount;
   if (currentSetSelectionMode !== 'first') config.setSelectionMode = currentSetSelectionMode;
+  if (currentSetSelectionMode === 'offsetRow') config.offsetRowRadius = currentOffsetRowRadius;
   if (currentNoiseIntensity !== 0) config.noiseIntensity = currentNoiseIntensity;
   if (currentNoiseFPS !== 10) config.noiseFPS = currentNoiseFPS;
   if (currentAvoid) {
@@ -883,6 +907,9 @@ function applyStateToUI(): void {
   setCountSlider.value = currentSetCount.toString();
   setCountValue.textContent = currentSetCount.toString();
   setSelectionModeSelect.value = currentSetSelectionMode;
+  offsetRowRadiusContainer.style.display = currentSetSelectionMode === 'offsetRow' ? 'flex' : 'none';
+  offsetRowRadiusSlider.value = currentOffsetRowRadius.toString();
+  offsetRowRadiusValue.textContent = currentOffsetRowRadius.toString();
   avoidCheckbox.checked = currentAvoid;
   avoidRadiusSlider.value = currentAvoidRadius.toString();
   avoidRadiusValue.textContent = currentAvoidRadius.toString();
@@ -966,6 +993,9 @@ loadResourceList().then(async () => {
       avoidContainer.style.display = 'flex';
       avoidRadiusContainer.style.display = currentAvoid ? 'flex' : 'none';
       avoidStrengthContainer.style.display = currentAvoid ? 'flex' : 'none';
+      offsetRowRadiusContainer.style.display = currentSetSelectionMode === 'offsetRow' ? 'flex' : 'none';
+      mosaic.setSetSelectionMode(currentSetSelectionMode);
+      mosaic.setOffsetRowRadius(currentOffsetRowRadius);
       mosaic.setAvoid(currentAvoid);
       mosaic.setAvoidRadius(currentAvoidRadius);
       mosaic.setAvoidStrength(currentAvoidStrength);

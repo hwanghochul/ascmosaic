@@ -27,7 +27,9 @@ export interface AsciiMosaicFilterOptions {
   /** 세트(행) 개수 - 셀 이미지를 나눌 행 개수 (기본값: 1) */
   setCount?: number;
   /** 세트 선택 모드 (기본값: 'first') */
-  setSelectionMode?: 'first' | 'random' | 'cycle';
+  setSelectionMode?: 'first' | 'random' | 'cycle' | 'offsetRow';
+  /** 세트변경(offsetRow) 시 마우스 영향 범위 픽셀 (기본값: 80) */
+  offsetRowRadius?: number;
   /** 회피하기: 셀이 마우스를 피해 이동 (기본값: false) */
   avoid?: boolean;
   /** 마우스 영향 범위(픽셀) (기본값: 80) */
@@ -56,7 +58,10 @@ export class AsciiMosaicFilter {
   private noiseIntensity: number;
   private noiseFPS: number;
   private setCount: number;
-  private setSelectionMode: 'first' | 'random' | 'cycle';
+  private setSelectionMode: 'first' | 'random' | 'cycle' | 'offsetRow';
+  private offsetRowRadius: number;
+  /** 세트변경 화면 출입 시 보간 (0~1) */
+  private effectiveOffsetRowStrength: number = 0;
   private time: number = 0.0;
   private lastNoiseUpdateTime: number = 0.0;
   private isEnabled: boolean = false;
@@ -122,6 +127,9 @@ export class AsciiMosaicFilter {
     uniform vec2 uResolution;
     uniform float uNoiseIntensity;
     uniform float uTime;
+    uniform vec2 uMouse;
+    uniform float uOffsetRowRadius;
+    uniform float uEffectiveOffsetRowStrength;
     
     varying vec2 vSampleUV;
     varying vec2 vLocalUV;
@@ -167,10 +175,24 @@ export class AsciiMosaicFilter {
         vec2 timeCoord = mosaicCoord + vec2(uTime * 0.1, uTime * 0.15);
         float rand = hash(timeCoord);
         selectedRow = floor(rand * uSetCount);
-      } else {
+      } else if (uSetSelectionMode < 2.5) {
         // 순회: 모든 셀이 같은 세트(열)를 사용하고, 시간에 따라 0 -> 1 -> 2 -> ... 순차 전환
         float timeOffset = floor(uTime * 10.0);
         selectedRow = mod(timeOffset, uSetCount);
+      } else {
+        // 세트변경(offsetRow): 세트 선택은 첫번째만 고정, 마우스 거리로 행 0~max 결정
+        vec2 centerNDC = vec2(
+          (mosaicCoord.x + 0.5 * uMosaicSize) / uResolution.x * 2.0 - 1.0,
+          1.0 - (mosaicCoord.y + 0.5 * uMosaicSize) / uResolution.y * 2.0
+        );
+        float dist = length(uMouse - centerNDC);
+        float rowFromMouse = 0.0;
+        if (uOffsetRowRadius > 0.0 && dist < uOffsetRowRadius) {
+          float t = 1.0 - dist / uOffsetRowRadius;
+          rowFromMouse = floor(t * uSetCount);
+          rowFromMouse = clamp(rowFromMouse, 0.0, uSetCount - 1.0);
+        }
+        selectedRow = mix(0.0, rowFromMouse, uEffectiveOffsetRowStrength);
       }
       selectedRow = clamp(selectedRow, 0.0, uSetCount - 1.0);
       
@@ -199,6 +221,7 @@ export class AsciiMosaicFilter {
     this.noiseFPS = options.noiseFPS ?? 15;
     this.setCount = Math.max(1, options.setCount ?? 1);
     this.setSelectionMode = options.setSelectionMode ?? 'first';
+    this.offsetRowRadius = Math.max(0, options.offsetRowRadius ?? 80);
     this.avoid = options.avoid ?? false;
     this.avoidRadius = Math.max(0, options.avoidRadius ?? 80);
     this.avoidStrength = Math.max(0, options.avoidStrength ?? 0.15);
@@ -277,11 +300,13 @@ export class AsciiMosaicFilter {
         uCellCount: { value: this.atlasResult.cellCount },
         uRowCount: { value: this.setCount },
         uSetCount: { value: this.setCount },
-        uSetSelectionMode: { value: this.setSelectionMode === 'first' ? 0 : this.setSelectionMode === 'random' ? 1 : 2 },
+        uSetSelectionMode: { value: this.setSelectionMode === 'first' ? 0 : this.setSelectionMode === 'random' ? 1 : this.setSelectionMode === 'cycle' ? 2 : 3 },
         uResolution: { value: new THREE.Vector2(w, h) },
         uNoiseIntensity: { value: this.noiseIntensity },
         uTime: { value: this.time },
         uMouse: { value: new THREE.Vector2(this.mouseX, this.mouseY) },
+        uOffsetRowRadius: { value: (this.offsetRowRadius / Math.min(w, h)) * 2 },
+        uEffectiveOffsetRowStrength: { value: this.effectiveOffsetRowStrength },
         uAvoidEnabled: { value: this.avoid ? 1 : 0 },
         uAvoidRadius: { value: (this.avoidRadius / Math.min(w, h)) * 2 },
         uAvoidStrength: { value: this.avoidStrength },
@@ -423,12 +448,13 @@ export class AsciiMosaicFilter {
     this.material.uniforms.uRowCount.value = this.setCount;
     this.material.uniforms.uSetCount.value = this.setCount;
     this.material.uniforms.uSetSelectionMode.value =
-      this.setSelectionMode === 'first' ? 0 : this.setSelectionMode === 'random' ? 1 : 2;
+      this.setSelectionMode === 'first' ? 0 : this.setSelectionMode === 'random' ? 1 : this.setSelectionMode === 'cycle' ? 2 : 3;
     const mouseNdcX = (this.mouseX / this.width) * 2 - 1;
-    const mouseNdcY = 1 - (this.mouseY / this.height) * 2;
+    const mouseNdcY = (this.mouseY / this.height) * 2 - 1;
     this.material.uniforms.uMouse.value.set(mouseNdcX, mouseNdcY);
     this.material.uniforms.uAvoidEnabled.value = this.avoid ? 1 : 0;
     this.material.uniforms.uAvoidRadius.value = (this.avoidRadius / Math.min(this.width, this.height)) * 2;
+    this.material.uniforms.uOffsetRowRadius.value = (this.offsetRowRadius / Math.min(this.width, this.height)) * 2;
 
     const now = performance.now();
     const deltaSec = this.lastRenderTime > 0 ? (now - this.lastRenderTime) / 1000 : 0.016;
@@ -437,6 +463,10 @@ export class AsciiMosaicFilter {
     const lerpSpeed = 6.0;
     this.effectiveAvoidStrength += (targetStrength - this.effectiveAvoidStrength) * Math.min(1, deltaSec * lerpSpeed);
     this.material.uniforms.uAvoidStrength.value = this.effectiveAvoidStrength;
+
+    const targetOffsetRow = this.setSelectionMode === 'offsetRow' && this.mouseIsInside ? 1 : 0;
+    this.effectiveOffsetRowStrength += (targetOffsetRow - this.effectiveOffsetRowStrength) * Math.min(1, deltaSec * lerpSpeed);
+    this.material.uniforms.uEffectiveOffsetRowStrength.value = this.effectiveOffsetRowStrength;
 
     this.renderer.render(this.scene, this.camera);
   }
@@ -522,11 +552,22 @@ export class AsciiMosaicFilter {
     }
   }
 
-  setSetSelectionMode(mode: 'first' | 'random' | 'cycle'): void {
+  setSetSelectionMode(mode: 'first' | 'random' | 'cycle' | 'offsetRow'): void {
     this.setSelectionMode = mode;
     if (this.material) {
       this.material.uniforms.uSetSelectionMode.value =
-        mode === 'first' ? 0 : mode === 'random' ? 1 : 2;
+        mode === 'first' ? 0 : mode === 'random' ? 1 : mode === 'cycle' ? 2 : 3;
+    }
+    if (this.isEnabled) {
+      if (mode === 'offsetRow' || this.avoid) this.attachMouseListener();
+      else this.detachMouseListener();
+    }
+  }
+
+  setOffsetRowRadius(radius: number): void {
+    this.offsetRowRadius = Math.max(0, radius);
+    if (this.material) {
+      this.material.uniforms.uOffsetRowRadius.value = (this.offsetRowRadius / Math.min(this.width, this.height)) * 2;
     }
   }
 
@@ -561,7 +602,7 @@ export class AsciiMosaicFilter {
 
   enable(): void {
     this.isEnabled = true;
-    if (this.avoid) this.attachMouseListener();
+    if (this.avoid || this.setSelectionMode === 'offsetRow') this.attachMouseListener();
   }
 
   disable(): void {

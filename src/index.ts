@@ -569,9 +569,18 @@ export class AscMosaic {
   /**
    * 모자이크 세트 선택 모드를 설정합니다
    */
-  setSetSelectionMode(mode: 'first' | 'random' | 'cycle'): void {
+  setSetSelectionMode(mode: 'first' | 'random' | 'cycle' | 'offsetRow'): void {
     if (this.asciiMosaicFilter) {
       this.asciiMosaicFilter.setSetSelectionMode(mode);
+    }
+  }
+
+  /**
+   * 세트변경(offsetRow) 마우스 영향 범위(픽셀) 설정
+   */
+  setOffsetRowRadius(radius: number): void {
+    if (this.asciiMosaicFilter) {
+      this.asciiMosaicFilter.setOffsetRowRadius(radius);
     }
   }
 

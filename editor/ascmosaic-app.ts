@@ -21,7 +21,8 @@ declare global {
       textureType?: 'image' | 'video';
       cellCount?: number;
       setCount?: number;
-      setSelectionMode?: 'first' | 'random' | 'cycle';
+      setSelectionMode?: 'first' | 'random' | 'cycle' | 'offsetRow';
+      offsetRowRadius?: number;
       noiseIntensity?: number;
       noiseFPS?: number;
       avoid?: boolean;
@@ -63,7 +64,8 @@ interface InstanceConfig {
   textureType?: 'image' | 'video';
   cellCount?: number;
   setCount?: number;
-  setSelectionMode?: 'first' | 'random' | 'cycle';
+  setSelectionMode?: 'first' | 'random' | 'cycle' | 'offsetRow';
+  offsetRowRadius?: number;
   noiseIntensity?: number;
   noiseFPS?: number;
   avoid?: boolean;
@@ -173,6 +175,7 @@ async function initContainer(container: HTMLElement): Promise<AscMosaic | null> 
     cellCount: config.cellCount ?? 6,
     setCount: config.setCount ?? 1,
     setSelectionMode: config.setSelectionMode ?? 'first',
+    offsetRowRadius: config.offsetRowRadius ?? 80,
     noiseIntensity: config.noiseIntensity ?? 0,
     noiseFPS: config.noiseFPS ?? 10,
     avoid: config.avoid ?? false,
