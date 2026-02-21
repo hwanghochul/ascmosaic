@@ -20,8 +20,6 @@ export interface AsciiMosaicFilterOptions {
   mosaicCellTextureUrl?: string;
   /** 모자이크 셀 아틀라스의 셀 개수 (가로 방향, 1행 N열) */
   cellCount?: number;
-  /** 배경색 (기본값: 흰색 0xffffff) */
-  backgroundColor?: THREE.Color | number;
   /** 노이즈 강도 (0.0 ~ 1.0, 기본값: 0.0) */
   noiseIntensity?: number;
   /** 노이즈 업데이트 FPS (기본값: 15) */
@@ -48,10 +46,13 @@ export class AsciiMosaicFilter {
   private scene: THREE.Scene;
   private camera: THREE.OrthographicCamera;
   private instancedMesh: THREE.InstancedMesh | null = null;
+  /** 이동량이 큰 셀만 그려서 앞에 오도록 (renderOrder 1) */
+  private frontInstancedMesh: THREE.InstancedMesh | null = null;
+  private frontInstanceSampleUVs: Float32Array | null = null;
+  private frontInstanceCenterNDCs: Float32Array | null = null;
   private material: THREE.ShaderMaterial | null = null;
   private atlasResult!: MosaicAtlasResult;
   private mosaicSize: number;
-  private backgroundColor: THREE.Color;
   private noiseIntensity: number;
   private noiseFPS: number;
   private setCount: number;
@@ -99,8 +100,6 @@ export class AsciiMosaicFilter {
         offset = -dir * push;
       }
       gl_Position.xy += offset;
-      // 많이 움직인 셀을 앞에 그리기: 오프셋 크기만큼 z를 당겨서 depth 정렬
-      gl_Position.z = -length(offset) * 0.001;
     }
   `;
 
@@ -113,7 +112,6 @@ export class AsciiMosaicFilter {
     uniform float uSetCount;
     uniform float uSetSelectionMode;
     uniform vec2 uResolution;
-    uniform vec3 uBackgroundColor;
     uniform float uNoiseIntensity;
     uniform float uTime;
     
@@ -141,7 +139,7 @@ export class AsciiMosaicFilter {
       float backgroundThreshold = 0.9;
       
       if (brightness >= backgroundThreshold) {
-        gl_FragColor = vec4(uBackgroundColor, 1.0);
+        gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);
         return;
       }
       
@@ -175,8 +173,7 @@ export class AsciiMosaicFilter {
       
       vec2 atlasUV = vec2(mix(uMin, uMax, vLocalUV.x), mix(vMax, vMin, vLocalUV.y));
       vec4 atlasColor = texture2D(tAtlas, atlasUV);
-      vec3 finalColor = mix(uBackgroundColor, atlasColor.rgb, atlasColor.a);
-      gl_FragColor = vec4(finalColor, 1.0);
+      gl_FragColor = atlasColor;
     }
   `;
 
@@ -198,14 +195,6 @@ export class AsciiMosaicFilter {
     this.avoidRadius = Math.max(0, options.avoidRadius ?? 80);
     this.avoidStrength = Math.max(0, options.avoidStrength ?? 0.15);
     this.lastNoiseUpdateTime = performance.now();
-
-    if (options.backgroundColor instanceof THREE.Color) {
-      this.backgroundColor = options.backgroundColor.clone();
-    } else if (typeof options.backgroundColor === 'number') {
-      this.backgroundColor = new THREE.Color(options.backgroundColor);
-    } else {
-      this.backgroundColor = new THREE.Color(0xffffff);
-    }
 
     this.renderTarget = new THREE.WebGLRenderTarget(width, height, {
       minFilter: THREE.LinearFilter,
@@ -282,7 +271,6 @@ export class AsciiMosaicFilter {
         uSetCount: { value: this.setCount },
         uSetSelectionMode: { value: this.setSelectionMode === 'first' ? 0 : this.setSelectionMode === 'random' ? 1 : 2 },
         uResolution: { value: new THREE.Vector2(w, h) },
-        uBackgroundColor: { value: this.backgroundColor },
         uNoiseIntensity: { value: this.noiseIntensity },
         uTime: { value: this.time },
         uMouse: { value: new THREE.Vector2(this.mouseX, this.mouseY) },
@@ -293,6 +281,8 @@ export class AsciiMosaicFilter {
       vertexShader: AsciiMosaicFilter.VERTEX_SHADER,
       fragmentShader: AsciiMosaicFilter.FRAGMENT_SHADER,
       transparent: true,
+      // depthWrite: false,
+      // depthTest: true,
       // wireframe: true, // 디버깅: 셀 경계 표시
     });
 
@@ -475,17 +465,6 @@ export class AsciiMosaicFilter {
     this.instanceCount = newCount;
     this.instancedMesh.count = newCount;
     this.updateInstanceMatrices(w, h, size);
-  }
-
-  setBackgroundColor(color: THREE.Color | number): void {
-    if (color instanceof THREE.Color) {
-      this.backgroundColor.copy(color);
-    } else {
-      this.backgroundColor.setHex(color);
-    }
-    if (this.material) {
-      this.material.uniforms.uBackgroundColor.value = this.backgroundColor;
-    }
   }
 
   setNoiseIntensity(intensity: number): void {

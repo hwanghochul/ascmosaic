@@ -235,7 +235,6 @@ function getMosaicFilterOptions() {
     mosaicSize: currentMosaicSize,
     mosaicCellTextureUrl: currentCellUrl,
     cellCount: currentCellCount,
-    backgroundColor: 0xffffff,
     noiseIntensity: currentNoiseIntensity,
     noiseFPS: currentNoiseFPS,
     setCount: currentSetCount,
