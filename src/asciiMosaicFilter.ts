@@ -402,12 +402,38 @@ export class AsciiMosaicFilter {
   private attachMouseListener(): void {
     if (this.mouseMoveBound !== null) return;
     const el = this.renderer.domElement;
+    this.mouseIsInside = true;
+    // 초기 마우스 위치를 캔버스 중앙으로 설정 (마우스가 이미 캔버스 위에 있을 경우를 대비)
+    this.mouseX = this.width / 2;
+    this.mouseY = this.height / 2;
     this.mouseMoveBound = (e: MouseEvent) => this.updateMousePosition(e);
     this.mouseLeaveBound = () => { this.mouseIsInside = false; };
     this.mouseEnterBound = () => { this.mouseIsInside = true; };
     el.addEventListener('mousemove', this.mouseMoveBound);
     el.addEventListener('mouseleave', this.mouseLeaveBound);
     el.addEventListener('mouseenter', this.mouseEnterBound);
+  }
+
+  /**
+   * 마우스 리스너가 필요한지 확인 (회피하기 또는 세트변경이 활성화되어 있는지)
+   */
+  private needsMouseListener(): boolean {
+    return this.avoid || this.setSelectionMode === 'offsetRow';
+  }
+
+  /**
+   * 마우스 리스너 상태를 업데이트 (필요하면 연결, 불필요하면 제거)
+   */
+  private updateMouseListenerState(): void {
+    if (!this.isEnabled) {
+      this.detachMouseListener();
+      return;
+    }
+    if (this.needsMouseListener()) {
+      this.attachMouseListener();
+    } else {
+      this.detachMouseListener();
+    }
   }
 
   private detachMouseListener(): void {
@@ -561,8 +587,7 @@ export class AsciiMosaicFilter {
         mode === 'first' ? 0 : mode === 'random' ? 1 : mode === 'cycle' ? 2 : 3;
     }
     if (this.isEnabled) {
-      if (mode === 'offsetRow' || this.avoid) this.attachMouseListener();
-      else this.detachMouseListener();
+      this.updateMouseListenerState();
     }
   }
 
@@ -579,8 +604,7 @@ export class AsciiMosaicFilter {
       this.material.uniforms.uAvoidEnabled.value = enabled ? 1 : 0;
     }
     if (this.isEnabled) {
-      if (enabled) this.attachMouseListener();
-      else this.detachMouseListener();
+      this.updateMouseListenerState();
     }
   }
 
@@ -604,7 +628,7 @@ export class AsciiMosaicFilter {
 
   enable(): void {
     this.isEnabled = true;
-    if (this.avoid || this.setSelectionMode === 'offsetRow') this.attachMouseListener();
+    this.updateMouseListenerState();
   }
 
   disable(): void {
