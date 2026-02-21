@@ -168,9 +168,9 @@ export class AsciiMosaicFilter {
         float rand = hash(timeCoord);
         selectedRow = floor(rand * uSetCount);
       } else {
-        float blockIndex = mosaicCoord.x + mosaicCoord.y * 1000.0;
+        // 순회: 모든 셀이 같은 세트(열)를 사용하고, 시간에 따라 0 -> 1 -> 2 -> ... 순차 전환
         float timeOffset = floor(uTime * 10.0);
-        selectedRow = mod(blockIndex + timeOffset, uSetCount);
+        selectedRow = mod(timeOffset, uSetCount);
       }
       selectedRow = clamp(selectedRow, 0.0, uSetCount - 1.0);
       
