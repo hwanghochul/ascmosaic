@@ -192,7 +192,9 @@ export class AsciiMosaicFilter {
           rowFromMouse = floor(t * uSetCount);
           rowFromMouse = clamp(rowFromMouse, 0.0, uSetCount - 1.0);
         }
-        selectedRow = mix(0.0, rowFromMouse, uEffectiveOffsetRowStrength);
+        // 1->2->3 처럼 정수 행만 전환 (스크롤되지 않도록)
+        float stepRow = floor(uEffectiveOffsetRowStrength * (rowFromMouse + 1.0));
+        selectedRow = min(stepRow, rowFromMouse);
       }
       selectedRow = clamp(selectedRow, 0.0, uSetCount - 1.0);
       
