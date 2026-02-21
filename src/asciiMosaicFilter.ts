@@ -30,6 +30,12 @@ export interface AsciiMosaicFilterOptions {
   setCount?: number;
   /** 세트 선택 모드 (기본값: 'first') */
   setSelectionMode?: 'first' | 'random' | 'cycle';
+  /** 회피하기: 마우스에 가까운 모자이크 블록이 마우스를 피해 이동 (기본값: false) */
+  avoid?: boolean;
+  /** 회피 반경 (픽셀, 기본값: 80) */
+  avoidRadius?: number;
+  /** 회피 강도 (기본값: 1.0) */
+  avoidStrength?: number;
 }
 
 /**
@@ -54,6 +60,12 @@ export class AsciiMosaicFilter {
   private time: number = 0.0;
   private lastNoiseUpdateTime: number = 0.0;
   private isEnabled: boolean = false;
+  private avoid: boolean;
+  private avoidRadius: number;
+  private avoidStrength: number;
+  private mouseX: number = -10000;
+  private mouseY: number = -10000;
+  private mouseMoveBound: ((e: MouseEvent) => void) | null = null;
 
   // 버텍스 쉐이더 (전체 화면 쿼드)
   private static readonly VERTEX_SHADER = `
@@ -78,6 +90,10 @@ export class AsciiMosaicFilter {
     uniform vec3 uBackgroundColor;
     uniform float uNoiseIntensity;
     uniform float uTime;
+    uniform vec2 uMouse;
+    uniform float uAvoidEnabled;
+    uniform float uAvoidRadius;
+    uniform float uAvoidStrength;
     
     varying vec2 vUv;
     
@@ -99,9 +115,36 @@ export class AsciiMosaicFilter {
       return h * 2.0 - 1.0; // -1.0 ~ 1.0 범위로 변환
     }
     
+    // 블록 중심(픽셀)에 대한 회피 변위 D_px 계산 (픽셀 단위)
+    vec2 avoidDisplacement(vec2 blockCenterPx) {
+      vec2 toMouse = uMouse - blockCenterPx;
+      float dist = length(toMouse);
+      if (dist >= uAvoidRadius || dist < 0.001) return vec2(0.0);
+      vec2 dir = normalize(toMouse);
+      float push = (1.0 - dist / uAvoidRadius) * uAvoidStrength;
+      return -dir * push * uMosaicSize;
+    }
+    
     void main() {
-      // 모자이크 블록 좌표 계산
-      vec2 mosaicCoord = floor(vUv * uResolution / uMosaicSize) * uMosaicSize;
+      vec2 posPx = vUv * uResolution;
+      vec2 mosaicCoord;
+      vec2 localCoord;
+      
+      if (uAvoidEnabled > 0.5 && uAvoidRadius > 0.0) {
+        // 픽셀 블록이 통째로 이동: 이 프래그를 덮는 블록을 찾고, 그 블록 내부 이미지는 그대로 유지
+        vec2 blockCenterAtFrag = floor(posPx / uMosaicSize) * uMosaicSize + 0.5 * uMosaicSize;
+        vec2 D_guess = avoidDisplacement(blockCenterAtFrag);
+        vec2 samplePosPx = posPx - D_guess;
+        mosaicCoord = floor(samplePosPx / uMosaicSize) * uMosaicSize;
+        vec2 D_sample = avoidDisplacement(mosaicCoord + 0.5 * uMosaicSize);
+        // 한 번 더: 이동한 블록 원점 기준으로 로컬 좌표 계산
+        localCoord = (posPx - mosaicCoord - D_sample) / uMosaicSize;
+        localCoord = clamp(localCoord, 0.0, 1.0);
+      } else {
+        mosaicCoord = floor(posPx / uMosaicSize) * uMosaicSize;
+        localCoord = fract(posPx / uMosaicSize);
+      }
+      
       vec2 sampleCoord = mosaicCoord / uResolution;
       
       // 원본 텍스처에서 샘플링 (블록의 첫 번째 픽셀 사용)
@@ -154,10 +197,7 @@ export class AsciiMosaicFilter {
       float vMin = selectedRow / uRowCount;
       float vMax = (selectedRow + 1.0) / uRowCount;
       
-      // 모자이크 블록 내에서의 로컬 좌표 (0 ~ 1)
-      vec2 localCoord = fract(vUv * uResolution / uMosaicSize);
-      
-      // 모자이크 셀 아틀라스에서 샘플링 (행에 따라 V 좌표 적용)
+      // 모자이크 셀 아틀라스에서 샘플링 (블록 내부 로컬 좌표 그대로 사용)
       vec2 atlasUV = vec2(mix(uMin, uMax, localCoord.x), mix(vMax, vMin, localCoord.y));
       vec4 atlasColor = texture2D(tAtlas, atlasUV);
       
@@ -179,6 +219,9 @@ export class AsciiMosaicFilter {
     this.noiseFPS = options.noiseFPS ?? 15; // 기본값: 15 FPS
     this.setCount = Math.max(1, options.setCount ?? 1);
     this.setSelectionMode = options.setSelectionMode ?? 'first';
+    this.avoid = options.avoid ?? false;
+    this.avoidRadius = Math.max(0, options.avoidRadius ?? 80);
+    this.avoidStrength = Math.max(0, options.avoidStrength ?? 1.0);
     this.lastNoiseUpdateTime = performance.now();
     
     // 배경색 설정
@@ -219,6 +262,10 @@ export class AsciiMosaicFilter {
           uBackgroundColor: { value: this.backgroundColor },
           uNoiseIntensity: { value: this.noiseIntensity },
           uTime: { value: this.time },
+          uMouse: { value: new THREE.Vector2(this.mouseX, this.mouseY) },
+          uAvoidEnabled: { value: this.avoid ? 1 : 0 },
+          uAvoidRadius: { value: this.avoidRadius },
+          uAvoidStrength: { value: this.avoidStrength },
         },
         vertexShader: AsciiMosaicFilter.VERTEX_SHADER,
         fragmentShader: AsciiMosaicFilter.FRAGMENT_SHADER,
@@ -275,6 +322,35 @@ export class AsciiMosaicFilter {
   }
 
   /**
+   * 마우스 위치를 캔버스 픽셀 좌표(쉐이더와 동일: 왼쪽 아래 원점)로 업데이트
+   */
+  private updateMousePosition(e: MouseEvent): void {
+    const el = this.renderer.domElement;
+    const rect = el.getBoundingClientRect();
+    const w = el.width;
+    const h = el.height;
+    if (w <= 0 || h <= 0) return;
+    const x = ((e.clientX - rect.left) / rect.width) * w;
+    const yCanvas = ((e.clientY - rect.top) / rect.height) * h;
+    this.mouseX = x;
+    this.mouseY = h - yCanvas; // 쉐이더는 아래쪽 원점
+  }
+
+  private attachMouseListener(): void {
+    if (this.mouseMoveBound !== null) return;
+    this.mouseMoveBound = (e: MouseEvent) => {
+      this.updateMousePosition(e);
+    };
+    this.renderer.domElement.addEventListener('mousemove', this.mouseMoveBound);
+  }
+
+  private detachMouseListener(): void {
+    if (this.mouseMoveBound === null) return;
+    this.renderer.domElement.removeEventListener('mousemove', this.mouseMoveBound);
+    this.mouseMoveBound = null;
+  }
+
+  /**
    * 필터를 적용하여 메인 렌더러에 렌더링
    */
   render(): void {
@@ -303,6 +379,10 @@ export class AsciiMosaicFilter {
     this.material.uniforms.uSetCount.value = this.setCount;
     this.material.uniforms.uSetSelectionMode.value =
       this.setSelectionMode === 'first' ? 0 : this.setSelectionMode === 'random' ? 1 : 2;
+    this.material.uniforms.uMouse.value.set(this.mouseX, this.mouseY);
+    this.material.uniforms.uAvoidEnabled.value = this.avoid ? 1 : 0;
+    this.material.uniforms.uAvoidRadius.value = this.avoidRadius;
+    this.material.uniforms.uAvoidStrength.value = this.avoidStrength;
 
     // 포스트 프로세싱 쿼드 렌더링
     this.renderer.render(this.scene, this.camera);
@@ -390,6 +470,40 @@ export class AsciiMosaicFilter {
   }
 
   /**
+   * 회피하기(avoid) 활성화 여부 설정
+   */
+  setAvoid(enabled: boolean): void {
+    this.avoid = enabled;
+    if (this.material) {
+      this.material.uniforms.uAvoidEnabled.value = enabled ? 1 : 0;
+    }
+    if (this.isEnabled) {
+      if (enabled) this.attachMouseListener();
+      else this.detachMouseListener();
+    }
+  }
+
+  /**
+   * 회피 반경 설정 (픽셀)
+   */
+  setAvoidRadius(radius: number): void {
+    this.avoidRadius = Math.max(0, radius);
+    if (this.material) {
+      this.material.uniforms.uAvoidRadius.value = this.avoidRadius;
+    }
+  }
+
+  /**
+   * 회피 강도 설정
+   */
+  setAvoidStrength(strength: number): void {
+    this.avoidStrength = Math.max(0, strength);
+    if (this.material) {
+      this.material.uniforms.uAvoidStrength.value = this.avoidStrength;
+    }
+  }
+
+  /**
    * RenderTarget 가져오기
    */
   getRenderTarget(): THREE.WebGLRenderTarget {
@@ -401,12 +515,14 @@ export class AsciiMosaicFilter {
    */
   enable(): void {
     this.isEnabled = true;
+    if (this.avoid) this.attachMouseListener();
   }
 
   /**
    * 필터 비활성화
    */
   disable(): void {
+    this.detachMouseListener();
     this.isEnabled = false;
   }
 
@@ -421,6 +537,7 @@ export class AsciiMosaicFilter {
    * 리소스 정리
    */
   dispose(): void {
+    this.detachMouseListener();
     if (this.quad) {
       this.quad.geometry.dispose();
       if (this.quad.material instanceof THREE.Material) {

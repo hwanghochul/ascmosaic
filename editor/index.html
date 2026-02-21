@@ -381,6 +381,19 @@
             </select>
           </div>
         </div>
+        <div class="control-row" id="avoid-container" style="display: none;">
+          <label><input type="checkbox" id="avoid-checkbox"> 회피하기</label>
+        </div>
+        <div class="control-row" id="avoid-radius-container" style="display: none;">
+          <label for="avoid-radius-slider">회피 범위</label>
+          <input type="range" id="avoid-radius-slider" min="20" max="200" value="80" step="5">
+          <span class="slider-value" id="avoid-radius-value">80</span>
+        </div>
+        <div class="control-row" id="avoid-strength-container" style="display: none;">
+          <label for="avoid-strength-slider">회피 강도</label>
+          <input type="range" id="avoid-strength-slider" min="0.1" max="3" value="1" step="0.1">
+          <span class="slider-value" id="avoid-strength-value">1.0</span>
+        </div>
         <div class="control-row" id="cell-select-container" style="display: none;">
           <label for="cell-select">셀 선택</label>
           <select id="cell-select" class="combo-select"></select>

@@ -25,6 +25,9 @@ declare global {
       backgroundColor?: number;
       noiseIntensity?: number;
       noiseFPS?: number;
+      avoid?: boolean;
+      avoidRadius?: number;
+      avoidStrength?: number;
       cameraPosition?: { x: number; y: number; z: number };
       cameraRotation?: { x: number; y: number; z: number };
       controlMode?: 'orbit' | 'fixed' | 'tilt';
@@ -65,6 +68,9 @@ interface InstanceConfig {
   backgroundColor?: number;
   noiseIntensity?: number;
   noiseFPS?: number;
+  avoid?: boolean;
+  avoidRadius?: number;
+  avoidStrength?: number;
   cameraPosition?: { x: number; y: number; z: number };
   cameraRotation?: { x: number; y: number; z: number };
   controlMode?: 'orbit' | 'fixed' | 'tilt';
@@ -172,6 +178,9 @@ async function initContainer(container: HTMLElement): Promise<AscMosaic | null> 
     backgroundColor: config.backgroundColor ?? 0xffffff,
     noiseIntensity: config.noiseIntensity ?? 0,
     noiseFPS: config.noiseFPS ?? 10,
+    avoid: config.avoid ?? false,
+    avoidRadius: config.avoidRadius ?? 80,
+    avoidStrength: config.avoidStrength ?? 1,
   });
 
   container.setAttribute('data-ascmosaic-initialized', 'true');

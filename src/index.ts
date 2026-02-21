@@ -576,6 +576,33 @@ export class AscMosaic {
   }
 
   /**
+   * 회피하기(avoid) 활성화 여부를 설정합니다
+   */
+  setAvoid(enabled: boolean): void {
+    if (this.asciiMosaicFilter) {
+      this.asciiMosaicFilter.setAvoid(enabled);
+    }
+  }
+
+  /**
+   * 회피 강도를 설정합니다 (셀이 마우스를 피해 움직이는 정도)
+   */
+  setAvoidStrength(strength: number): void {
+    if (this.asciiMosaicFilter) {
+      this.asciiMosaicFilter.setAvoidStrength(strength);
+    }
+  }
+
+  /**
+   * 회피 범위를 설정합니다 (마우스로부터 이 거리 안의 픽셀이 반응, 픽셀 단위)
+   */
+  setAvoidRadius(radius: number): void {
+    if (this.asciiMosaicFilter) {
+      this.asciiMosaicFilter.setAvoidRadius(radius);
+    }
+  }
+
+  /**
    * Scene 가져오기
    */
   getScene(): THREE.Scene {

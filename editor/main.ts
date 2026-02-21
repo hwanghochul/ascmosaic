@@ -48,6 +48,14 @@ const setConfigContainer = document.getElementById('set-config-container')!;
 const setCountSlider = document.getElementById('set-count-slider')! as HTMLInputElement;
 const setCountValue = document.getElementById('set-count-value')!;
 const setSelectionModeSelect = document.getElementById('set-selection-mode-select')! as HTMLSelectElement;
+const avoidContainer = document.getElementById('avoid-container')!;
+const avoidCheckbox = document.getElementById('avoid-checkbox')! as HTMLInputElement;
+const avoidRadiusContainer = document.getElementById('avoid-radius-container')!;
+const avoidRadiusSlider = document.getElementById('avoid-radius-slider')! as HTMLInputElement;
+const avoidRadiusValue = document.getElementById('avoid-radius-value')!;
+const avoidStrengthContainer = document.getElementById('avoid-strength-container')!;
+const avoidStrengthSlider = document.getElementById('avoid-strength-slider')! as HTMLInputElement;
+const avoidStrengthValue = document.getElementById('avoid-strength-value')!;
 const generateHtmlBtn = document.getElementById('generate-html-btn')!;
 const previewHtmlBtn = document.getElementById('preview-html-btn')!;
 const copyCodeBtn = document.getElementById('copy-code-btn')!;
@@ -79,6 +87,9 @@ function loadStateFromURL(): boolean {
     if (state.cellUrl !== undefined) currentCellUrl = state.cellUrl;
     if (state.setCount !== undefined) currentSetCount = state.setCount;
     if (state.setSelectionMode !== undefined) currentSetSelectionMode = state.setSelectionMode;
+    if (state.avoid !== undefined) currentAvoid = state.avoid;
+    if (state.avoidRadius !== undefined) currentAvoidRadius = state.avoidRadius;
+    if (state.avoidStrength !== undefined) currentAvoidStrength = state.avoidStrength;
     if (state.shape !== undefined) currentShape = state.shape;
     if (state.radius !== undefined) currentRadius = state.radius;
     if (state.cubeSize !== undefined) currentCubeSize = state.cubeSize;
@@ -113,6 +124,9 @@ function saveStateToURL(): void {
     cellUrl: currentCellUrl,
     setCount: currentSetCount,
     setSelectionMode: currentSetSelectionMode,
+    avoid: currentAvoid,
+    avoidRadius: currentAvoidRadius,
+    avoidStrength: currentAvoidStrength,
     textureType: currentTextureType,
     shape: currentShape,
     radius: currentRadius,
@@ -212,6 +226,9 @@ let currentTiltSmoothness = 0.15;
 let currentSetCount = 1;
 let currentSetSelectionMode: 'first' | 'random' | 'cycle' = 'first';
 let currentTextureType: 'image' | 'video' = 'image';
+let currentAvoid = false;
+let currentAvoidRadius = 80;
+let currentAvoidStrength = 1;
 
 function getMosaicFilterOptions() {
   return {
@@ -223,6 +240,9 @@ function getMosaicFilterOptions() {
     noiseFPS: currentNoiseFPS,
     setCount: currentSetCount,
     setSelectionMode: currentSetSelectionMode,
+    avoid: currentAvoid,
+    avoidRadius: currentAvoidRadius,
+    avoidStrength: currentAvoidStrength,
   };
 }
 
@@ -279,6 +299,14 @@ asciiToggleBtn.addEventListener('click', async () => {
       cellCountContainer.style.display = 'flex';
       cellSelectContainer.style.display = 'flex';
       setConfigContainer.style.display = 'block';
+      avoidContainer.style.display = 'flex';
+      avoidCheckbox.checked = currentAvoid;
+      avoidRadiusContainer.style.display = currentAvoid ? 'flex' : 'none';
+      avoidRadiusSlider.value = String(currentAvoidRadius);
+      avoidRadiusValue.textContent = String(currentAvoidRadius);
+      avoidStrengthContainer.style.display = currentAvoid ? 'flex' : 'none';
+      avoidStrengthSlider.value = String(currentAvoidStrength);
+      avoidStrengthValue.textContent = currentAvoidStrength.toFixed(1);
       setCountValue.textContent = String(currentSetCount);
       updateHTMLCodeIfRealtime();
     } else {
@@ -290,6 +318,9 @@ asciiToggleBtn.addEventListener('click', async () => {
       cellCountContainer.style.display = 'none';
       cellSelectContainer.style.display = 'none';
       setConfigContainer.style.display = 'none';
+      avoidContainer.style.display = 'none';
+      avoidRadiusContainer.style.display = 'none';
+      avoidStrengthContainer.style.display = 'none';
     }
     updateHTMLCodeIfRealtime();
   } catch (error) {
@@ -366,6 +397,39 @@ setSelectionModeSelect.addEventListener('change', () => {
   currentSetSelectionMode = setSelectionModeSelect.value as 'first' | 'random' | 'cycle';
   if (mosaic.isAsciiMosaicFilterEnabled()) {
     mosaic.setSetSelectionMode(currentSetSelectionMode);
+  }
+  updateHTMLCodeIfRealtime();
+});
+
+// 회피하기 체크박스 이벤트
+avoidCheckbox.addEventListener('change', () => {
+  currentAvoid = avoidCheckbox.checked;
+  avoidRadiusContainer.style.display = currentAvoid ? 'flex' : 'none';
+  avoidStrengthContainer.style.display = currentAvoid ? 'flex' : 'none';
+  if (mosaic.isAsciiMosaicFilterEnabled()) {
+    mosaic.setAvoid(currentAvoid);
+  }
+  updateHTMLCodeIfRealtime();
+});
+
+// 회피 범위 슬라이더 이벤트
+avoidRadiusSlider.addEventListener('input', () => {
+  const radius = parseInt(avoidRadiusSlider.value, 10);
+  currentAvoidRadius = radius;
+  avoidRadiusValue.textContent = String(radius);
+  if (mosaic.isAsciiMosaicFilterEnabled()) {
+    mosaic.setAvoidRadius(radius);
+  }
+  updateHTMLCodeIfRealtime();
+});
+
+// 회피 강도 슬라이더 이벤트
+avoidStrengthSlider.addEventListener('input', () => {
+  const strength = parseFloat(avoidStrengthSlider.value);
+  currentAvoidStrength = strength;
+  avoidStrengthValue.textContent = strength.toFixed(1);
+  if (mosaic.isAsciiMosaicFilterEnabled()) {
+    mosaic.setAvoidStrength(strength);
   }
   updateHTMLCodeIfRealtime();
 });
@@ -637,7 +701,10 @@ function generateHTMLCode(): string {
   if (currentSetSelectionMode !== 'first') config.setSelectionMode = currentSetSelectionMode;
   if (currentNoiseIntensity !== 0) config.noiseIntensity = currentNoiseIntensity;
   if (currentNoiseFPS !== 10) config.noiseFPS = currentNoiseFPS;
-  
+  if (currentAvoid) config.avoid = true;
+  if (currentAvoid && currentAvoidRadius !== 80) config.avoidRadius = currentAvoidRadius;
+  if (currentAvoid && currentAvoidStrength !== 1) config.avoidStrength = currentAvoidStrength;
+
   // 카메라 위치/회전
   config.cameraPosition = {
     x: camera.position.x,
@@ -841,6 +908,11 @@ function applyStateToUI(): void {
   canvasWidthValue.textContent = currentCanvasWidth.toString();
   canvasHeightSlider.value = currentCanvasHeight.toString();
   canvasHeightValue.textContent = currentCanvasHeight.toString();
+  avoidCheckbox.checked = currentAvoid;
+  avoidRadiusSlider.value = String(currentAvoidRadius);
+  avoidRadiusValue.textContent = String(currentAvoidRadius);
+  avoidStrengthSlider.value = currentAvoidStrength.toFixed(1);
+  avoidStrengthValue.textContent = currentAvoidStrength.toFixed(1);
   realTimeCodeToggle.checked = realTimeCodeGen;
   generateHtmlBtn.style.display = realTimeCodeGen ? 'none' : 'inline-block';
 }
@@ -891,6 +963,14 @@ loadResourceList().then(async () => {
       cellCountContainer.style.display = 'flex';
       cellSelectContainer.style.display = 'flex';
       setConfigContainer.style.display = 'block';
+      avoidContainer.style.display = 'flex';
+      avoidCheckbox.checked = currentAvoid;
+      avoidRadiusContainer.style.display = currentAvoid ? 'flex' : 'none';
+      avoidRadiusSlider.value = String(currentAvoidRadius);
+      avoidRadiusValue.textContent = String(currentAvoidRadius);
+      avoidStrengthContainer.style.display = currentAvoid ? 'flex' : 'none';
+      avoidStrengthSlider.value = String(currentAvoidStrength);
+      avoidStrengthValue.textContent = currentAvoidStrength.toFixed(1);
     }
     
     updateHTMLCodeIfRealtime();
