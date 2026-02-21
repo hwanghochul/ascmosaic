@@ -99,6 +99,8 @@ export class AsciiMosaicFilter {
         offset = -dir * push;
       }
       gl_Position.xy += offset;
+      // 많이 움직인 셀을 앞에 그리기: 오프셋 크기만큼 z를 당겨서 depth 정렬
+      gl_Position.z = -length(offset) * 0.001;
     }
   `;
 
@@ -291,7 +293,7 @@ export class AsciiMosaicFilter {
       vertexShader: AsciiMosaicFilter.VERTEX_SHADER,
       fragmentShader: AsciiMosaicFilter.FRAGMENT_SHADER,
       transparent: true,
-      wireframe: true, // 디버깅: 셀 경계 표시
+      // wireframe: true, // 디버깅: 셀 경계 표시
     });
 
     const geometry = this.planeGeometry.clone();
