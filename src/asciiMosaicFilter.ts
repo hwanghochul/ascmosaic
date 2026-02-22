@@ -185,7 +185,9 @@ export class AsciiMosaicFilter {
           (mosaicCoord.x + 0.5 * uMosaicSize) / uResolution.x * 2.0 - 1.0,
           1.0 - (mosaicCoord.y + 0.5 * uMosaicSize) / uResolution.y * 2.0
         );
-        float dist = length(uMouse - centerNDC);
+        // uMouse의 y는 회피하기와 호환을 위해 뒤집어져 있으므로, 세트변경에서는 다시 뒤집어야 함
+        vec2 mouseForOffsetRow = vec2(uMouse.x, -uMouse.y);
+        float dist = length(mouseForOffsetRow - centerNDC);
         float rowFromMouse = 0.0;
         if (uOffsetRowRadius > 0.0 && dist < uOffsetRowRadius) {
           float t = 1.0 - dist / uOffsetRowRadius;
@@ -478,7 +480,9 @@ export class AsciiMosaicFilter {
     this.material.uniforms.uSetSelectionMode.value =
       this.setSelectionMode === 'first' ? 0 : this.setSelectionMode === 'random' ? 1 : this.setSelectionMode === 'cycle' ? 2 : 3;
     const mouseNdcX = (this.mouseX / this.width) * 2 - 1;
-    const mouseNdcY = (this.mouseY / this.height) * 2 - 1;
+    // WebGL NDC 좌표계: y=1이 위, y=-1이 아래 (화면 좌표계와 반대)
+    // instanceCenterNDC도 같은 좌표계를 사용하므로 y를 뒤집어야 함
+    const mouseNdcY = 1.0 - (this.mouseY / this.height) * 2;
     this.material.uniforms.uMouse.value.set(mouseNdcX, mouseNdcY);
     this.material.uniforms.uAvoidEnabled.value = this.avoid ? 1 : 0;
     this.material.uniforms.uAvoidRadius.value = (this.avoidRadius / Math.min(this.width, this.height)) * 2;
