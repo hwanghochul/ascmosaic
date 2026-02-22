@@ -59,6 +59,8 @@ const avoidRadiusValue = document.getElementById('avoid-radius-value')!;
 const avoidStrengthContainer = document.getElementById('avoid-strength-container')!;
 const avoidStrengthSlider = document.getElementById('avoid-strength-slider')! as HTMLInputElement;
 const avoidStrengthValue = document.getElementById('avoid-strength-value')!;
+const adjustCellOrderContainer = document.getElementById('adjust-cell-order-container')!;
+const adjustCellOrderCheckbox = document.getElementById('adjust-cell-order-checkbox')! as HTMLInputElement;
 const generateHtmlBtn = document.getElementById('generate-html-btn')!;
 const previewHtmlBtn = document.getElementById('preview-html-btn')!;
 const copyCodeBtn = document.getElementById('copy-code-btn')!;
@@ -84,11 +86,13 @@ const cameraFovSlider = document.getElementById('camera-fov-slider')! as HTMLInp
 const cameraFovValue = document.getElementById('camera-fov-value')!;
 const cameraResetBtn = document.getElementById('camera-reset-btn')!;
 const cameraOrbitGroup = document.getElementById('camera-orbit-group')!;
+const backgroundColorInput = document.getElementById('background-color-input')! as HTMLInputElement;
 
 let realTimeCodeGen = true;
 let currentCameraFov = 75;
 let currentCanvasWidth = 800;
 let currentCanvasHeight = 600;
+let currentBackgroundColor = '#ffffff';
 let lastCameraState: { target: THREE.Vector3; distance: number; theta: number; phi: number } | null = null;
 let cameraStateSaveTimeout: number | null = null;
 
@@ -122,6 +126,7 @@ function loadStateFromURL(): boolean {
         currentAvoidStrength = state.avoidStrength;
       }
     }
+    if (state.adjustCellOrder !== undefined) currentAdjustCellOrder = state.adjustCellOrder;
     if (state.shape !== undefined) currentShape = state.shape;
     if (state.radius !== undefined) currentRadius = state.radius;
     if (state.cubeSize !== undefined) currentCubeSize = state.cubeSize;
@@ -139,6 +144,7 @@ function loadStateFromURL(): boolean {
     if (state.canvasWidth !== undefined) currentCanvasWidth = state.canvasWidth;
     if (state.canvasHeight !== undefined) currentCanvasHeight = state.canvasHeight;
     if (state.realTimeCodeGen !== undefined) realTimeCodeGen = state.realTimeCodeGen;
+    if (state.backgroundColor !== undefined) currentBackgroundColor = state.backgroundColor;
     
     // 카메라 상태 복원
     if (state.cameraTarget && state.cameraDistance !== undefined && 
@@ -189,6 +195,7 @@ function saveStateToURL(): void {
     canvasWidth: currentCanvasWidth,
     canvasHeight: currentCanvasHeight,
     realTimeCodeGen: realTimeCodeGen,
+    backgroundColor: currentBackgroundColor,
   };
   
   // 카메라 상태 저장 (OrbitControls가 활성화되어 있을 때만)
@@ -288,6 +295,7 @@ let currentOffsetRowRadius = 80;
 let currentAvoid = false;
 let currentAvoidRadius = 80;
 let currentAvoidStrength = 20; // 픽셀 단위
+let currentAdjustCellOrder = false;
 let currentTextureType: 'image' | 'video' = 'image';
 
 function getMosaicFilterOptions() {
@@ -303,6 +311,7 @@ function getMosaicFilterOptions() {
     avoid: currentAvoid,
     avoidRadius: currentAvoidRadius,
     avoidStrength: currentAvoidStrength,
+    adjustCellOrder: currentAdjustCellOrder,
   };
 }
 
@@ -362,6 +371,7 @@ asciiToggleBtn.addEventListener('click', async () => {
       avoidContainer.style.display = 'flex';
       avoidRadiusContainer.style.display = currentAvoid ? 'flex' : 'none';
       avoidStrengthContainer.style.display = currentAvoid ? 'flex' : 'none';
+      adjustCellOrderContainer.style.display = currentAvoid ? 'flex' : 'none';
       offsetRowRadiusContainer.style.display = currentSetSelectionMode === 'offsetRow' ? 'flex' : 'none';
       setCountValue.textContent = String(currentSetCount);
       mosaic.setSetSelectionMode(currentSetSelectionMode);
@@ -369,6 +379,10 @@ asciiToggleBtn.addEventListener('click', async () => {
       mosaic.setAvoid(currentAvoid);
       mosaic.setAvoidRadius(currentAvoidRadius);
       mosaic.setAvoidStrength(currentAvoidStrength);
+      const filter = mosaic.getAsciiMosaicFilter();
+      if (filter) {
+        (filter as any).setAdjustCellOrder(currentAdjustCellOrder);
+      }
       updateHTMLCodeIfRealtime();
     } else {
       asciiToggleBtn.textContent = 'ASCII 필터 토글';
@@ -480,8 +494,25 @@ avoidCheckbox.addEventListener('change', () => {
   currentAvoid = avoidCheckbox.checked;
   avoidRadiusContainer.style.display = currentAvoid ? 'flex' : 'none';
   avoidStrengthContainer.style.display = currentAvoid ? 'flex' : 'none';
+  adjustCellOrderContainer.style.display = currentAvoid ? 'flex' : 'none';
+  if (!currentAvoid) {
+    currentAdjustCellOrder = false;
+    adjustCellOrderCheckbox.checked = false;
+  }
   if (mosaic.isAsciiMosaicFilterEnabled()) {
     mosaic.setAvoid(currentAvoid);
+    if (mosaic.getAsciiMosaicFilter()) {
+      (mosaic.getAsciiMosaicFilter() as any).setAdjustCellOrder(currentAdjustCellOrder);
+    }
+  }
+  updateHTMLCodeIfRealtime();
+});
+
+// 셀 순서조정 체크박스 이벤트
+adjustCellOrderCheckbox.addEventListener('change', () => {
+  currentAdjustCellOrder = adjustCellOrderCheckbox.checked;
+  if (mosaic.isAsciiMosaicFilterEnabled() && mosaic.getAsciiMosaicFilter()) {
+    (mosaic.getAsciiMosaicFilter() as any).setAdjustCellOrder(currentAdjustCellOrder);
   }
   updateHTMLCodeIfRealtime();
 });
@@ -730,6 +761,14 @@ cameraResetBtn.addEventListener('click', () => {
   resetCamera();
 });
 
+// 배경색 변경
+backgroundColorInput.addEventListener('input', () => {
+  currentBackgroundColor = backgroundColorInput.value;
+  canvasContainer.style.backgroundColor = currentBackgroundColor;
+  updateHTMLCodeIfRealtime();
+  saveStateToURL();
+});
+
 // 조명 추가
 mosaic.addLights();
 
@@ -848,6 +887,7 @@ function generateHTMLCode(): string {
     config.avoid = true;
     config.avoidRadius = currentAvoidRadius;
     config.avoidStrength = currentAvoidStrength;
+    if (currentAdjustCellOrder) config.adjustCellOrder = currentAdjustCellOrder;
   }
 
   // 카메라 위치/회전
@@ -877,9 +917,16 @@ function generateHTMLCode(): string {
   if (currentCanvasWidth !== 800) config.canvasWidth = currentCanvasWidth;
   if (currentCanvasHeight !== 600) config.canvasHeight = currentCanvasHeight;
   
+  // 배경색 스타일 생성
+  const styleParts = [`width:${currentCanvasWidth}px`, `height:${currentCanvasHeight}px`];
+  if (currentBackgroundColor !== '#ffffff') {
+    styleParts.push(`background-color:${currentBackgroundColor}`);
+  }
+  const styleAttr = styleParts.join(';');
+  
   const configJson = JSON.stringify(config);
   return `<!-- AscMosaic 캔버스 -->
-<div class="canvas-container ascmosaic" style="width:${currentCanvasWidth}px;height:${currentCanvasHeight}px;" data-ascmosaic-config='${configJson}'></div>
+<div class="canvas-container ascmosaic" style="${styleAttr};" data-ascmosaic-config='${configJson}'></div>
 
 <!-- 
   여러 캔버스를 추가하는 경우:
@@ -1142,6 +1189,8 @@ function applyStateToUI(): void {
   avoidRadiusValue.textContent = currentAvoidRadius.toString();
   avoidStrengthSlider.value = currentAvoidStrength.toString();
   avoidStrengthValue.textContent = currentAvoidStrength.toString();
+  adjustCellOrderCheckbox.checked = currentAdjustCellOrder;
+  adjustCellOrderContainer.style.display = currentAvoid ? 'flex' : 'none';
   shapeSelect.value = currentShape;
   sphereRadiusSlider.value = currentRadius.toString();
   sphereRadiusValue.textContent = currentRadius.toFixed(1);
@@ -1169,6 +1218,8 @@ function applyStateToUI(): void {
   canvasHeightValue.textContent = currentCanvasHeight.toString();
   realTimeCodeToggle.checked = realTimeCodeGen;
   generateHtmlBtn.style.display = realTimeCodeGen ? 'none' : 'inline-block';
+  backgroundColorInput.value = currentBackgroundColor;
+  canvasContainer.style.backgroundColor = currentBackgroundColor;
   updateCameraControls();
 }
 
@@ -1244,12 +1295,17 @@ loadResourceList().then(async () => {
       avoidContainer.style.display = 'flex';
       avoidRadiusContainer.style.display = currentAvoid ? 'flex' : 'none';
       avoidStrengthContainer.style.display = currentAvoid ? 'flex' : 'none';
+      adjustCellOrderContainer.style.display = currentAvoid ? 'flex' : 'none';
       offsetRowRadiusContainer.style.display = currentSetSelectionMode === 'offsetRow' ? 'flex' : 'none';
       mosaic.setSetSelectionMode(currentSetSelectionMode);
       mosaic.setOffsetRowRadius(currentOffsetRowRadius);
       mosaic.setAvoid(currentAvoid);
       mosaic.setAvoidRadius(currentAvoidRadius);
       mosaic.setAvoidStrength(currentAvoidStrength);
+      const filter = mosaic.getAsciiMosaicFilter();
+      if (filter) {
+        (filter as any).setAdjustCellOrder(currentAdjustCellOrder);
+      }
     }
 
     updateHTMLCodeIfRealtime();

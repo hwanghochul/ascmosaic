@@ -651,6 +651,10 @@ export class AscMosaic {
     return this.orbitControls;
   }
 
+  getAsciiMosaicFilter(): AsciiMosaicFilter | null {
+    return this.asciiMosaicFilter;
+  }
+
   /**
    * 리소스를 정리합니다
    */

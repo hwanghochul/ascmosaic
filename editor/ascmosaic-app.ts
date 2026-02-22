@@ -28,6 +28,7 @@ declare global {
       avoid?: boolean;
       avoidRadius?: number;
       avoidStrength?: number;
+      adjustCellOrder?: boolean;
       cameraPosition?: { x: number; y: number; z: number };
       cameraRotation?: { x: number; y: number; z: number };
       controlMode?: 'orbit' | 'fixed' | 'tilt';
@@ -71,6 +72,7 @@ interface InstanceConfig {
   avoid?: boolean;
   avoidRadius?: number;
   avoidStrength?: number;
+  adjustCellOrder?: boolean;
   cameraPosition?: { x: number; y: number; z: number };
   cameraRotation?: { x: number; y: number; z: number };
   controlMode?: 'orbit' | 'fixed' | 'tilt';
@@ -181,6 +183,7 @@ async function initContainer(container: HTMLElement): Promise<AscMosaic | null> 
     avoid: config.avoid ?? false,
     avoidRadius: config.avoidRadius ?? 80,
     avoidStrength: config.avoidStrength ?? 20, // 픽셀 단위
+    adjustCellOrder: config.adjustCellOrder ?? false,
   });
 
   container.setAttribute('data-ascmosaic-initialized', 'true');

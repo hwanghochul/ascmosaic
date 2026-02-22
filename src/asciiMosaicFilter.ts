@@ -36,6 +36,8 @@ export interface AsciiMosaicFilterOptions {
   avoidRadius?: number;
   /** 이동 강도 (기본값: 0.15) */
   avoidStrength?: number;
+  /** 셀 순서조정: 회피하기 시 z 위치와 알파 디스카드로 순서 조정 (기본값: false) */
+  adjustCellOrder?: boolean;
 }
 
 /**
@@ -48,10 +50,6 @@ export class AsciiMosaicFilter {
   private scene: THREE.Scene;
   private camera: THREE.OrthographicCamera;
   private instancedMesh: THREE.InstancedMesh | null = null;
-  /** 이동량이 큰 셀만 그려서 앞에 오도록 (renderOrder 1) */
-  private frontInstancedMesh: THREE.InstancedMesh | null = null;
-  private frontInstanceSampleUVs: Float32Array | null = null;
-  private frontInstanceCenterNDCs: Float32Array | null = null;
   private material: THREE.ShaderMaterial | null = null;
   private atlasResult!: MosaicAtlasResult;
   private mosaicSize: number;
@@ -75,6 +73,7 @@ export class AsciiMosaicFilter {
   private avoid: boolean;
   private avoidRadius: number;
   private avoidStrength: number;
+  private adjustCellOrder: boolean;
   private mouseX: number = -10000;
   private mouseY: number = -10000;
   private mouseIsInside: boolean = false;
@@ -97,6 +96,7 @@ export class AsciiMosaicFilter {
     uniform float uAvoidEnabled;
     uniform float uAvoidRadius;
     uniform float uAvoidStrength;
+    uniform float uAdjustCellOrder;
     
     void main() {
       vSampleUV = instanceSampleUV;
@@ -115,8 +115,10 @@ export class AsciiMosaicFilter {
         offset = -dir * pushPx / max(lenPx, 0.001);
       }
       gl_Position.xy += offset;
-      // 중심에서 많이 움직일수록 카메라에 가깝게 (z를 당겨서 앞에 그리기)
-      // gl_Position.z = -length(offset) * 0.0001;
+      
+      if (uAdjustCellOrder > 0.5) {
+        gl_Position.z = -length(offset) * 0.0001;
+      }
     }
   `;
 
@@ -135,6 +137,7 @@ export class AsciiMosaicFilter {
     uniform vec2 uMousePx;
     uniform float uOffsetRowRadius;
     uniform float uEffectiveOffsetRowStrength;
+    uniform float uAdjustCellOrder;
     
     varying vec2 vSampleUV;
     varying vec2 vLocalUV;
@@ -160,8 +163,7 @@ export class AsciiMosaicFilter {
       float backgroundThreshold = 0.9;
       
       if (brightness >= backgroundThreshold) {
-        gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);
-        return;
+        discard;
       }
       
       vec2 mosaicCoord = floor(vSampleUV * uResolution / uMosaicSize) * uMosaicSize;
@@ -211,6 +213,13 @@ export class AsciiMosaicFilter {
       
       vec2 atlasUV = vec2(mix(uMin, uMax, vLocalUV.x), mix(vMax, vMin, vLocalUV.y));
       vec4 atlasColor = texture2D(tAtlas, atlasUV);
+      
+      if (uAdjustCellOrder > 0.5) {
+        if (atlasColor.a <= 0.5) {
+          discard;
+        }
+      }
+      
       gl_FragColor = atlasColor;
     }
   `;
@@ -233,6 +242,7 @@ export class AsciiMosaicFilter {
     this.avoid = options.avoid ?? false;
     this.avoidRadius = Math.max(0, options.avoidRadius ?? 80);
     this.avoidStrength = Math.max(0, options.avoidStrength ?? 0.15);
+    this.adjustCellOrder = options.adjustCellOrder ?? false;
     this.lastNoiseUpdateTime = performance.now();
 
     this.renderTarget = new THREE.WebGLRenderTarget(width, height, {
@@ -319,11 +329,12 @@ export class AsciiMosaicFilter {
         uAvoidEnabled: { value: this.avoid ? 1 : 0 },
         uAvoidRadius: { value: this.avoidRadius },
         uAvoidStrength: { value: this.avoidStrength },
+        uAdjustCellOrder: { value: (this.avoid && this.adjustCellOrder) ? 1 : 0 },
       },
       vertexShader: AsciiMosaicFilter.VERTEX_SHADER,
       fragmentShader: AsciiMosaicFilter.FRAGMENT_SHADER,
       transparent: true,
-      depthWrite: false,
+      // depthWrite: false,
       // depthTest: true,
       // wireframe: true, // 디버깅: 셀 경계 표시
     });
@@ -611,9 +622,20 @@ export class AsciiMosaicFilter {
     this.avoid = enabled;
     if (this.material) {
       this.material.uniforms.uAvoidEnabled.value = enabled ? 1 : 0;
+      // uAdjustCellOrder는 회피하기와 셀 순서조정이 모두 활성화되어 있을 때만 1
+      this.material.uniforms.uAdjustCellOrder.value = (this.avoid && this.adjustCellOrder) ? 1 : 0;
     }
     if (this.isEnabled) {
       this.updateMouseListenerState();
+    }
+  }
+
+  setAdjustCellOrder(enabled: boolean): void {
+    if (this.adjustCellOrder === enabled) return;
+    this.adjustCellOrder = enabled;
+    // uniform 값만 업데이트
+    if (this.material) {
+      this.material.uniforms.uAdjustCellOrder.value = (this.avoid && this.adjustCellOrder) ? 1 : 0;
     }
   }
 
