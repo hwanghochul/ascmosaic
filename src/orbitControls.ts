@@ -284,6 +284,13 @@ export class OrbitControls {
   }
 
   /**
+   * 타겟 가져오기
+   */
+  getTarget(): THREE.Vector3 {
+    return this.target.clone();
+  }
+
+  /**
    * 거리 설정
    */
   setDistance(distance: number): void {
@@ -292,6 +299,75 @@ export class OrbitControls {
       Math.min(this.maxDistance, distance)
     );
     this.updateCamera();
+  }
+
+  /**
+   * 거리 가져오기
+   */
+  getDistance(): number {
+    return this.distance;
+  }
+
+  /**
+   * 수평 각도 설정
+   */
+  setTheta(theta: number): void {
+    this.theta = theta;
+    this.updateCamera();
+  }
+
+  /**
+   * 수평 각도 가져오기
+   */
+  getTheta(): number {
+    return this.theta;
+  }
+
+  /**
+   * 수직 각도 설정
+   */
+  setPhi(phi: number): void {
+    this.phi = Math.max(
+      this.minPolarAngle,
+      Math.min(this.maxPolarAngle, phi)
+    );
+    this.updateCamera();
+  }
+
+  /**
+   * 수직 각도 가져오기
+   */
+  getPhi(): number {
+    return this.phi;
+  }
+
+  /**
+   * 카메라 상태 설정 (타겟, 거리, 각도)
+   */
+  setCameraState(target: THREE.Vector3, distance: number, theta: number, phi: number): void {
+    this.target.copy(target);
+    this.distance = Math.max(
+      this.minDistance,
+      Math.min(this.maxDistance, distance)
+    );
+    this.theta = theta;
+    this.phi = Math.max(
+      this.minPolarAngle,
+      Math.min(this.maxPolarAngle, phi)
+    );
+    this.updateCamera();
+  }
+
+  /**
+   * 카메라 상태 가져오기 (타겟, 거리, 각도)
+   */
+  getCameraState(): { target: THREE.Vector3; distance: number; theta: number; phi: number } {
+    return {
+      target: this.target.clone(),
+      distance: this.distance,
+      theta: this.theta,
+      phi: this.phi,
+    };
   }
 
   /**

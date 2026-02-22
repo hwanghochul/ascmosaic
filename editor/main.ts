@@ -1,4 +1,4 @@
-import { AscMosaic } from '../src/index';
+import { AscMosaic, THREE } from '../src/index';
 
 // DOM 요소 가져오기
 const canvasContainer = document.getElementById('canvas-container')!;
@@ -68,10 +68,29 @@ const canvasWidthSlider = document.getElementById('canvas-width-slider')! as HTM
 const canvasWidthValue = document.getElementById('canvas-width-value')!;
 const canvasHeightSlider = document.getElementById('canvas-height-slider')! as HTMLInputElement;
 const canvasHeightValue = document.getElementById('canvas-height-value')!;
+const cameraPosXSlider = document.getElementById('camera-pos-x-slider')! as HTMLInputElement;
+const cameraPosXValue = document.getElementById('camera-pos-x-value')!;
+const cameraPosYSlider = document.getElementById('camera-pos-y-slider')! as HTMLInputElement;
+const cameraPosYValue = document.getElementById('camera-pos-y-value')!;
+const cameraPosZSlider = document.getElementById('camera-pos-z-slider')! as HTMLInputElement;
+const cameraPosZValue = document.getElementById('camera-pos-z-value')!;
+const cameraThetaSlider = document.getElementById('camera-theta-slider')! as HTMLInputElement;
+const cameraThetaValue = document.getElementById('camera-theta-value')!;
+const cameraPhiSlider = document.getElementById('camera-phi-slider')! as HTMLInputElement;
+const cameraPhiValue = document.getElementById('camera-phi-value')!;
+const cameraDistanceSlider = document.getElementById('camera-distance-slider')! as HTMLInputElement;
+const cameraDistanceValue = document.getElementById('camera-distance-value')!;
+const cameraFovSlider = document.getElementById('camera-fov-slider')! as HTMLInputElement;
+const cameraFovValue = document.getElementById('camera-fov-value')!;
+const cameraResetBtn = document.getElementById('camera-reset-btn')!;
+const cameraOrbitGroup = document.getElementById('camera-orbit-group')!;
 
 let realTimeCodeGen = true;
+let currentCameraFov = 75;
 let currentCanvasWidth = 800;
 let currentCanvasHeight = 600;
+let lastCameraState: { target: THREE.Vector3; distance: number; theta: number; phi: number } | null = null;
+let cameraStateSaveTimeout: number | null = null;
 
 // URL에서 상태 복원
 function loadStateFromURL(): boolean {
@@ -112,6 +131,18 @@ function loadStateFromURL(): boolean {
     if (state.canvasHeight !== undefined) currentCanvasHeight = state.canvasHeight;
     if (state.realTimeCodeGen !== undefined) realTimeCodeGen = state.realTimeCodeGen;
     
+    // 카메라 상태 복원
+    if (state.cameraTarget && state.cameraDistance !== undefined && 
+        state.cameraTheta !== undefined && state.cameraPhi !== undefined) {
+      // applyStateToUI에서 OrbitControls가 설정된 후 복원하도록 플래그 설정
+      (window as any).__restoreCameraState = {
+        target: state.cameraTarget,
+        distance: state.cameraDistance,
+        theta: state.cameraTheta,
+        phi: state.cameraPhi,
+      };
+    }
+    
     return true;
   } catch {
     return false;
@@ -150,6 +181,20 @@ function saveStateToURL(): void {
     canvasHeight: currentCanvasHeight,
     realTimeCodeGen: realTimeCodeGen,
   };
+  
+  // 카메라 상태 저장 (OrbitControls가 활성화되어 있을 때만)
+  const orbitControls = mosaic.getOrbitControls();
+  if (orbitControls && currentControlMode === 'orbit') {
+    const cameraState = orbitControls.getCameraState();
+    (state as any).cameraTarget = {
+      x: cameraState.target.x,
+      y: cameraState.target.y,
+      z: cameraState.target.z,
+    };
+    (state as any).cameraDistance = cameraState.distance;
+    (state as any).cameraTheta = cameraState.theta;
+    (state as any).cameraPhi = cameraState.phi;
+  }
   
   const stateJson = encodeURIComponent(JSON.stringify(state));
   const newUrl = new URL(window.location.href);
@@ -565,6 +610,7 @@ controlModeSelect.addEventListener('change', () => {
       orbitControls.dispose();
     }
   }
+  updateCameraControls();
   updateHTMLCodeIfRealtime();
 });
 
@@ -607,6 +653,73 @@ tiltSmoothnessSlider.addEventListener('input', () => {
     mosaic.setupTiltControls(currentTiltInvertX, currentTiltInvertY, maxAngleRad, currentTiltSmoothness);
   }
   updateHTMLCodeIfRealtime();
+});
+
+// 카메라 위치 슬라이더 (오비트가 아닐 때만 적용)
+function applyCameraPositionFromSliders(): void {
+  if (currentControlMode === 'orbit') return;
+  const camera = mosaic.getCamera();
+  camera.position.set(
+    parseFloat(cameraPosXSlider.value),
+    parseFloat(cameraPosYSlider.value),
+    parseFloat(cameraPosZSlider.value)
+  );
+  lastCameraPosition = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
+  updateHTMLCodeIfRealtime();
+}
+cameraPosXSlider.addEventListener('input', () => {
+  cameraPosXValue.textContent = cameraPosXSlider.value;
+  applyCameraPositionFromSliders();
+});
+cameraPosYSlider.addEventListener('input', () => {
+  cameraPosYValue.textContent = cameraPosYSlider.value;
+  applyCameraPositionFromSliders();
+});
+cameraPosZSlider.addEventListener('input', () => {
+  cameraPosZValue.textContent = cameraPosZSlider.value;
+  applyCameraPositionFromSliders();
+});
+
+// 카메라 회전/거리 슬라이더 (오비트 모드일 때만 적용)
+function applyCameraOrbitFromSliders(): void {
+  const orbitControls = mosaic.getOrbitControls();
+  if (!orbitControls || currentControlMode !== 'orbit') return;
+  const target = orbitControls.getTarget();
+  const distance = Math.max(ORBIT_MIN_DISTANCE, Math.min(ORBIT_MAX_DISTANCE, parseFloat(cameraDistanceSlider.value)));
+  const theta = parseFloat(cameraThetaSlider.value);
+  const phi = Math.max(ORBIT_MIN_POLAR, Math.min(ORBIT_MAX_POLAR, parseFloat(cameraPhiSlider.value)));
+  orbitControls.setCameraState(target, distance, theta, phi);
+  cameraDistanceValue.textContent = distance.toFixed(2);
+  cameraThetaValue.textContent = theta.toFixed(2);
+  cameraPhiValue.textContent = phi.toFixed(2);
+  updateHTMLCodeIfRealtime();
+}
+cameraThetaSlider.addEventListener('input', () => {
+  cameraThetaValue.textContent = cameraThetaSlider.value;
+  applyCameraOrbitFromSliders();
+});
+cameraPhiSlider.addEventListener('input', () => {
+  cameraPhiValue.textContent = cameraPhiSlider.value;
+  applyCameraOrbitFromSliders();
+});
+cameraDistanceSlider.addEventListener('input', () => {
+  cameraDistanceValue.textContent = cameraDistanceSlider.value;
+  applyCameraOrbitFromSliders();
+});
+
+// FOV 슬라이더
+cameraFovSlider.addEventListener('input', () => {
+  const fov = Math.max(10, Math.min(120, parseFloat(cameraFovSlider.value)));
+  currentCameraFov = fov;
+  cameraFovValue.textContent = String(Math.round(fov));
+  const camera = mosaic.getCamera();
+  camera.fov = fov;
+  camera.updateProjectionMatrix();
+  updateHTMLCodeIfRealtime();
+});
+
+cameraResetBtn.addEventListener('click', () => {
+  resetCamera();
 });
 
 // 조명 추가
@@ -778,6 +891,80 @@ function updateHTMLCodeIfRealtime(): void {
   saveStateToURL();
 }
 
+const ORBIT_MIN_DISTANCE = 3;
+const ORBIT_MAX_DISTANCE = 10;
+const ORBIT_MIN_POLAR = Math.PI / 6;
+const ORBIT_MAX_POLAR = (5 * Math.PI) / 6;
+
+function getModelCenter(): THREE.Vector3 | null {
+  const scene = mosaic.getScene();
+  const model = scene.children.find((c) => !(c instanceof THREE.Light));
+  if (!model) return null;
+  const box = new THREE.Box3().setFromObject(model);
+  if (box.isEmpty()) return null;
+  return box.getCenter(new THREE.Vector3());
+}
+
+function resetCamera(): void {
+  const center = getModelCenter() ?? new THREE.Vector3(0, 0, 0);
+  const orbitControls = mosaic.getOrbitControls();
+  const camera = mosaic.getCamera();
+
+  if (orbitControls && currentControlMode === 'orbit') {
+    const distance = Math.max(
+      ORBIT_MIN_DISTANCE,
+      Math.min(ORBIT_MAX_DISTANCE, (ORBIT_MIN_DISTANCE + ORBIT_MAX_DISTANCE) / 2)
+    );
+    const theta = 0;
+    const phi = Math.PI / 2;
+    orbitControls.setCameraState(center.clone(), distance, theta, phi);
+  } else {
+    const distance = Math.max(ORBIT_MIN_DISTANCE, Math.min(ORBIT_MAX_DISTANCE, 5));
+    camera.position.set(center.x, center.y, center.z + distance);
+    camera.lookAt(center);
+  }
+  lastCameraPosition = { x: camera.position.x, y: camera.position.y, z: camera.position.z };
+  lastCameraRotation = { x: camera.rotation.x, y: camera.rotation.y, z: camera.rotation.z };
+  updateCameraControls();
+  updateHTMLCodeIfRealtime();
+}
+
+function updateCameraControls(): void {
+  const camera = mosaic.getCamera();
+  const pos = camera.position;
+
+  cameraPosXSlider.value = String(Math.max(-20, Math.min(20, pos.x)));
+  cameraPosXValue.textContent = Number(cameraPosXSlider.value).toFixed(2);
+  cameraPosYSlider.value = String(Math.max(-20, Math.min(20, pos.y)));
+  cameraPosYValue.textContent = Number(cameraPosYSlider.value).toFixed(2);
+  cameraPosZSlider.value = String(Math.max(-20, Math.min(20, pos.z)));
+  cameraPosZValue.textContent = Number(cameraPosZSlider.value).toFixed(2);
+
+  const orbitControls = mosaic.getOrbitControls();
+  if (orbitControls && currentControlMode === 'orbit') {
+    cameraOrbitGroup.style.display = 'block';
+    const state = orbitControls.getCameraState();
+    cameraThetaSlider.min = String(-Math.PI);
+    cameraThetaSlider.max = String(Math.PI);
+    cameraThetaSlider.value = String(state.theta);
+    cameraThetaValue.textContent = state.theta.toFixed(2);
+    cameraPhiSlider.min = String(ORBIT_MIN_POLAR);
+    cameraPhiSlider.max = String(ORBIT_MAX_POLAR);
+    cameraPhiSlider.value = String(state.phi);
+    cameraPhiValue.textContent = state.phi.toFixed(2);
+    cameraDistanceSlider.min = String(ORBIT_MIN_DISTANCE);
+    cameraDistanceSlider.max = String(ORBIT_MAX_DISTANCE);
+    cameraDistanceSlider.value = String(state.distance);
+    cameraDistanceValue.textContent = state.distance.toFixed(2);
+  } else {
+    cameraOrbitGroup.style.display = 'none';
+  }
+
+  currentCameraFov = camera.fov;
+  cameraFovSlider.value = String(Math.round(camera.fov));
+  cameraFovValue.textContent = String(Math.round(camera.fov));
+}
+
 function checkCameraUpdate(): void {
   const camera = mosaic.getCamera();
   const pos = camera.position;
@@ -792,8 +979,40 @@ function checkCameraUpdate(): void {
   ) {
     lastCameraPosition = { x: pos.x, y: pos.y, z: pos.z };
     lastCameraRotation = { x: rot.x, y: rot.y, z: rot.z };
+    updateCameraControls();
     // 카메라 위치는 HTML 코드만 업데이트하고 URL은 업데이트하지 않음 (너무 자주 변경됨)
     if (realTimeCodeGen) updateHTMLCode();
+  }
+  
+  // OrbitControls 상태 확인 및 URL 저장 (디바운스 적용)
+  const orbitControls = mosaic.getOrbitControls();
+  if (orbitControls && currentControlMode === 'orbit') {
+    const currentState = orbitControls.getCameraState();
+    const stateChanged = !lastCameraState ||
+      Math.abs(currentState.target.x - lastCameraState.target.x) > 0.001 ||
+      Math.abs(currentState.target.y - lastCameraState.target.y) > 0.001 ||
+      Math.abs(currentState.target.z - lastCameraState.target.z) > 0.001 ||
+      Math.abs(currentState.distance - lastCameraState.distance) > 0.001 ||
+      Math.abs(currentState.theta - lastCameraState.theta) > 0.001 ||
+      Math.abs(currentState.phi - lastCameraState.phi) > 0.001;
+    
+    if (stateChanged) {
+      lastCameraState = {
+        target: currentState.target.clone(),
+        distance: currentState.distance,
+        theta: currentState.theta,
+        phi: currentState.phi,
+      };
+      
+      // 디바운스: 500ms 후에 URL 저장
+      if (cameraStateSaveTimeout !== null) {
+        clearTimeout(cameraStateSaveTimeout);
+      }
+      cameraStateSaveTimeout = window.setTimeout(() => {
+        saveStateToURL();
+        cameraStateSaveTimeout = null;
+      }, 500);
+    }
   }
 }
 
@@ -942,6 +1161,7 @@ function applyStateToUI(): void {
   canvasHeightValue.textContent = currentCanvasHeight.toString();
   realTimeCodeToggle.checked = realTimeCodeGen;
   generateHtmlBtn.style.display = realTimeCodeGen ? 'none' : 'inline-block';
+  updateCameraControls();
 }
 
 // 초기 슬라이더 값 표시 업데이트
@@ -966,17 +1186,40 @@ loadResourceList().then(async () => {
         rotateSpeed: 1.0,
         zoomSpeed: 0.1,
       });
+      
+      // 카메라 상태 복원
+      const restoreCameraState = (window as any).__restoreCameraState;
+      if (restoreCameraState) {
+        const orbitControls = mosaic.getOrbitControls();
+        if (orbitControls) {
+          const target = new THREE.Vector3(
+            restoreCameraState.target.x,
+            restoreCameraState.target.y,
+            restoreCameraState.target.z
+          );
+          orbitControls.setCameraState(
+            target,
+            restoreCameraState.distance,
+            restoreCameraState.theta,
+            restoreCameraState.phi
+          );
+        }
+        delete (window as any).__restoreCameraState;
+      }
+      updateCameraControls();
     } else if (currentControlMode === 'tilt') {
       const maxAngleRad = (currentTiltMaxAngle * Math.PI) / 180;
       mosaic.setupTiltControls(currentTiltInvertX, currentTiltInvertY, maxAngleRad, currentTiltSmoothness);
       tiltInvertContainer.style.display = 'flex';
       tiltSettingsContainer.style.display = 'block';
+      updateCameraControls();
     } else {
       mosaic.disableTiltControls();
       const orbitControls = mosaic.getOrbitControls();
       if (orbitControls) {
         orbitControls.dispose();
       }
+      updateCameraControls();
     }
     
     // ASCII 필터 상태 복원

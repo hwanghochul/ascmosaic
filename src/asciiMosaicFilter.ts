@@ -92,6 +92,8 @@ export class AsciiMosaicFilter {
     varying vec2 vLocalUV;
     
     uniform vec2 uMouse;
+    uniform vec2 uMousePx;
+    uniform vec2 uResolution;
     uniform float uAvoidEnabled;
     uniform float uAvoidRadius;
     uniform float uAvoidStrength;
@@ -102,13 +104,15 @@ export class AsciiMosaicFilter {
       vec4 mvPosition = modelViewMatrix * instanceMatrix * vec4(position, 1.0);
       gl_Position = projectionMatrix * mvPosition;
       
+      vec2 centerPx = vec2((instanceCenterNDC.x + 1.0) * 0.5 * uResolution.x, (1.0 - instanceCenterNDC.y) * 0.5 * uResolution.y);
+      float distPx = length(uMousePx - centerPx);
       vec2 toMouse = uMouse - instanceCenterNDC;
-      float dist = length(toMouse);
       vec2 offset = vec2(0.0);
-      if (uAvoidEnabled > 0.5 && uAvoidRadius > 0.0 && dist < uAvoidRadius && dist > 0.001) {
+      if (uAvoidEnabled > 0.5 && uAvoidRadius > 0.0 && distPx < uAvoidRadius && distPx > 0.001) {
         vec2 dir = normalize(toMouse);
-        float push = (1.0 - dist / uAvoidRadius) * uAvoidStrength;
-        offset = -dir * push;
+        float pushPx = (1.0 - distPx / uAvoidRadius) * uAvoidStrength * min(uResolution.x, uResolution.y) * 0.2;
+        float lenPx = length(vec2(dir.x * uResolution.x * 0.5, dir.y * uResolution.y * 0.5));
+        offset = -dir * pushPx / max(lenPx, 0.001);
       }
       gl_Position.xy += offset;
       // 중심에서 많이 움직일수록 카메라에 가깝게 (z를 당겨서 앞에 그리기)
@@ -128,6 +132,7 @@ export class AsciiMosaicFilter {
     uniform float uNoiseIntensity;
     uniform float uTime;
     uniform vec2 uMouse;
+    uniform vec2 uMousePx;
     uniform float uOffsetRowRadius;
     uniform float uEffectiveOffsetRowStrength;
     
@@ -180,17 +185,16 @@ export class AsciiMosaicFilter {
         float timeOffset = floor(uTime * 10.0);
         selectedRow = mod(timeOffset, uSetCount);
       } else {
-        // 세트변경(offsetRow): 세트 선택은 첫번째만 고정, 마우스 거리로 행 0~max 결정
+        // 세트변경(offsetRow): 세트 선택은 첫번째만 고정, 마우스 거리(픽셀)로 행 0~max 결정 (원형 범위)
         vec2 centerNDC = vec2(
           (mosaicCoord.x + 0.5 * uMosaicSize) / uResolution.x * 2.0 - 1.0,
           1.0 - (mosaicCoord.y + 0.5 * uMosaicSize) / uResolution.y * 2.0
         );
-        // uMouse의 y는 회피하기와 호환을 위해 뒤집어져 있으므로, 세트변경에서는 다시 뒤집어야 함
-        vec2 mouseForOffsetRow = vec2(uMouse.x, -uMouse.y);
-        float dist = length(mouseForOffsetRow - centerNDC);
+        vec2 centerPx = vec2((centerNDC.x + 1.0) * 0.5 * uResolution.x, (1.0 - centerNDC.y) * 0.5 * uResolution.y);
+        float distPx = length(uMousePx - centerPx);
         float rowFromMouse = 0.0;
-        if (uOffsetRowRadius > 0.0 && dist < uOffsetRowRadius) {
-          float t = 1.0 - dist / uOffsetRowRadius;
+        if (uOffsetRowRadius > 0.0 && distPx < uOffsetRowRadius) {
+          float t = 1.0 - distPx / uOffsetRowRadius;
           rowFromMouse = floor(t * uSetCount);
           rowFromMouse = clamp(rowFromMouse, 0.0, uSetCount - 1.0);
         }
@@ -309,10 +313,11 @@ export class AsciiMosaicFilter {
         uNoiseIntensity: { value: this.noiseIntensity },
         uTime: { value: this.time },
         uMouse: { value: new THREE.Vector2(this.mouseX, this.mouseY) },
-        uOffsetRowRadius: { value: (this.offsetRowRadius / Math.min(w, h)) * 2 },
+        uMousePx: { value: new THREE.Vector2(this.mouseX, this.mouseY) },
+        uOffsetRowRadius: { value: this.offsetRowRadius },
         uEffectiveOffsetRowStrength: { value: this.effectiveOffsetRowStrength },
         uAvoidEnabled: { value: this.avoid ? 1 : 0 },
-        uAvoidRadius: { value: (this.avoidRadius / Math.min(w, h)) * 2 },
+        uAvoidRadius: { value: this.avoidRadius },
         uAvoidStrength: { value: this.avoidStrength },
       },
       vertexShader: AsciiMosaicFilter.VERTEX_SHADER,
@@ -404,10 +409,10 @@ export class AsciiMosaicFilter {
   private attachMouseListener(): void {
     if (this.mouseMoveBound !== null) return;
     const el = this.renderer.domElement;
-    this.mouseIsInside = true;
-    // 초기 마우스 위치를 캔버스 중앙으로 설정 (마우스가 이미 캔버스 위에 있을 경우를 대비)
-    this.mouseX = this.width / 2;
-    this.mouseY = this.height / 2;
+    this.mouseIsInside = false;
+    // 기본 마우스 위치는 화면 밖 (이동 강도/세트변경이 마우스 들어올 때까지 비활성)
+    this.mouseX = -10000;
+    this.mouseY = -10000;
     this.mouseMoveBound = (e: MouseEvent) => this.updateMousePosition(e);
     this.mouseLeaveBound = () => { this.mouseIsInside = false; };
     this.mouseEnterBound = () => { this.mouseIsInside = true; };
@@ -481,12 +486,12 @@ export class AsciiMosaicFilter {
       this.setSelectionMode === 'first' ? 0 : this.setSelectionMode === 'random' ? 1 : this.setSelectionMode === 'cycle' ? 2 : 3;
     const mouseNdcX = (this.mouseX / this.width) * 2 - 1;
     // WebGL NDC 좌표계: y=1이 위, y=-1이 아래 (화면 좌표계와 반대)
-    // instanceCenterNDC도 같은 좌표계를 사용하므로 y를 뒤집어야 함
     const mouseNdcY = 1.0 - (this.mouseY / this.height) * 2;
     this.material.uniforms.uMouse.value.set(mouseNdcX, mouseNdcY);
+    this.material.uniforms.uMousePx.value.set(this.mouseX, this.mouseY);
     this.material.uniforms.uAvoidEnabled.value = this.avoid ? 1 : 0;
-    this.material.uniforms.uAvoidRadius.value = (this.avoidRadius / Math.min(this.width, this.height)) * 2;
-    this.material.uniforms.uOffsetRowRadius.value = (this.offsetRowRadius / Math.min(this.width, this.height)) * 2;
+    this.material.uniforms.uAvoidRadius.value = this.avoidRadius;
+    this.material.uniforms.uOffsetRowRadius.value = this.offsetRowRadius;
 
     const now = performance.now();
     const deltaSec = this.lastRenderTime > 0 ? (now - this.lastRenderTime) / 1000 : 0.016;
@@ -598,7 +603,7 @@ export class AsciiMosaicFilter {
   setOffsetRowRadius(radius: number): void {
     this.offsetRowRadius = Math.max(0, radius);
     if (this.material) {
-      this.material.uniforms.uOffsetRowRadius.value = (this.offsetRowRadius / Math.min(this.width, this.height)) * 2;
+      this.material.uniforms.uOffsetRowRadius.value = this.offsetRowRadius;
     }
   }
 
@@ -615,7 +620,7 @@ export class AsciiMosaicFilter {
   setAvoidRadius(radius: number): void {
     this.avoidRadius = Math.max(0, radius);
     if (this.material) {
-      this.material.uniforms.uAvoidRadius.value = (this.avoidRadius / Math.min(this.width, this.height)) * 2;
+      this.material.uniforms.uAvoidRadius.value = this.avoidRadius;
     }
   }
 

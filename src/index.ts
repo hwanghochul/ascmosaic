@@ -140,6 +140,9 @@ export class AscMosaic {
       }
     }
 
+    // 기존 모델이 있었는지 확인 (카메라 위치 조정 여부 결정)
+    const hadExistingModel = this.model !== null;
+    
     // shape가 변경되었거나 텍스처가 변경된 경우: 새로 생성
     if (this.model) {
       this.scene.remove(this.model);
@@ -163,13 +166,13 @@ export class AscMosaic {
       });
       this.model = null;
     }
-
+    
     this.model = await createTexturedMesh(opts);
     this.scene.add(this.model);
     this.modelOptions = { ...opts };
 
-    // 모델의 bounding box를 계산하여 카메라 위치 조정
-    if (this.model) {
+    // 모델이 처음 생성될 때만 카메라 위치 조정 (기존 모델이 없었던 경우)
+    if (!hadExistingModel && this.model) {
       const box = new THREE.Box3().setFromObject(this.model);
       if (!box.isEmpty()) {
         const size = box.getSize(new THREE.Vector3());
@@ -197,9 +200,6 @@ export class AscMosaic {
         this.camera.position.set(0, 0, 5);
         this.camera.lookAt(0, 0, 0);
       }
-    } else {
-      this.camera.position.set(0, 0, 5);
-      this.camera.lookAt(0, 0, 0);
     }
 
     return this.model;
@@ -734,3 +734,5 @@ export { OrbitControls, type OrbitControlsOptions } from './orbitControls';
 
 // Three.js를 재내보내기
 export * from 'three';
+import * as THREE from 'three';
+export { THREE };

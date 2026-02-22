@@ -189,6 +189,7 @@ export function createTexturedMesh(options: TexturedMeshOptions = {}): Promise<T
       const mesh = new THREE.Mesh(geometry, material);
       mesh.name = 'TexturedMesh';
       mesh.scale.setScalar(scale);
+      if (shape === 'plane') mesh.rotation.y = Math.PI / 2;
       return mesh;
     }).catch(() => {
       const material = new THREE.MeshBasicMaterial({ 
@@ -198,6 +199,7 @@ export function createTexturedMesh(options: TexturedMeshOptions = {}): Promise<T
       const mesh = new THREE.Mesh(geometry, material);
       mesh.name = 'TexturedMesh';
       mesh.scale.setScalar(scale);
+      if (shape === 'plane') mesh.rotation.y = Math.PI / 2;
       return mesh;
     });
   }
@@ -235,6 +237,10 @@ export function createTexturedMesh(options: TexturedMeshOptions = {}): Promise<T
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = 'TexturedMesh';
   mesh.scale.setScalar(scale);
+  // 평면: 기본은 +Z 방향(서쪽)이므로, 남쪽(-Z)을 보도록 Y축 180도 회전
+  if (shape === 'plane') {
+    mesh.rotation.y = Math.PI / 2;
+  }
 
   return Promise.resolve(mesh);
 }
