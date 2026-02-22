@@ -180,7 +180,7 @@ async function initContainer(container: HTMLElement): Promise<AscMosaic | null> 
     noiseFPS: config.noiseFPS ?? 10,
     avoid: config.avoid ?? false,
     avoidRadius: config.avoidRadius ?? 80,
-    avoidStrength: config.avoidStrength ?? 0.15,
+    avoidStrength: config.avoidStrength ?? 20, // 픽셀 단위
   });
 
   container.setAttribute('data-ascmosaic-initialized', 'true');

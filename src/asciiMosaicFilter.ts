@@ -110,7 +110,7 @@ export class AsciiMosaicFilter {
       vec2 offset = vec2(0.0);
       if (uAvoidEnabled > 0.5 && uAvoidRadius > 0.0 && distPx < uAvoidRadius && distPx > 0.001) {
         vec2 dir = normalize(toMouse);
-        float pushPx = (1.0 - distPx / uAvoidRadius) * uAvoidStrength * min(uResolution.x, uResolution.y) * 0.2;
+        float pushPx = (1.0 - distPx / uAvoidRadius) * uAvoidStrength;
         float lenPx = length(vec2(dir.x * uResolution.x * 0.5, dir.y * uResolution.y * 0.5));
         offset = -dir * pushPx / max(lenPx, 0.001);
       }
@@ -186,11 +186,11 @@ export class AsciiMosaicFilter {
         selectedRow = mod(timeOffset, uSetCount);
       } else {
         // 세트변경(offsetRow): 세트 선택은 첫번째만 고정, 마우스 거리(픽셀)로 행 0~max 결정 (원형 범위)
-        vec2 centerNDC = vec2(
-          (mosaicCoord.x + 0.5 * uMosaicSize) / uResolution.x * 2.0 - 1.0,
-          1.0 - (mosaicCoord.y + 0.5 * uMosaicSize) / uResolution.y * 2.0
+        // centerPx 계산: mosaicCoord는 픽셀 좌표계이므로 그대로 사용 (회피하기와 동일한 픽셀 좌표계)
+        vec2 centerPx = vec2(
+          mosaicCoord.x + 0.5 * uMosaicSize,
+          uResolution.y - (mosaicCoord.y + 0.5 * uMosaicSize)
         );
-        vec2 centerPx = vec2((centerNDC.x + 1.0) * 0.5 * uResolution.x, (1.0 - centerNDC.y) * 0.5 * uResolution.y);
         float distPx = length(uMousePx - centerPx);
         float rowFromMouse = 0.0;
         if (uOffsetRowRadius > 0.0 && distPx < uOffsetRowRadius) {

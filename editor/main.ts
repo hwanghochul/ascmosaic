@@ -112,7 +112,16 @@ function loadStateFromURL(): boolean {
     if (state.offsetRowRadius !== undefined) currentOffsetRowRadius = state.offsetRowRadius;
     if (state.avoid !== undefined) currentAvoid = state.avoid;
     if (state.avoidRadius !== undefined) currentAvoidRadius = state.avoidRadius;
-    if (state.avoidStrength !== undefined) currentAvoidStrength = state.avoidStrength;
+    if (state.avoidStrength !== undefined) {
+      // 기존 소수 값(0.15 등)을 픽셀 단위로 변환 (호환성)
+      if (state.avoidStrength < 1.0) {
+        // 기존 형식: 화면 크기 의존적이었으므로 평균적으로 20픽셀 정도로 변환
+        currentAvoidStrength = Math.round(state.avoidStrength * 100);
+      } else {
+        // 새 형식: 이미 픽셀 단위
+        currentAvoidStrength = state.avoidStrength;
+      }
+    }
     if (state.shape !== undefined) currentShape = state.shape;
     if (state.radius !== undefined) currentRadius = state.radius;
     if (state.cubeSize !== undefined) currentCubeSize = state.cubeSize;
@@ -278,7 +287,7 @@ let currentSetSelectionMode: 'first' | 'random' | 'cycle' | 'offsetRow' = 'first
 let currentOffsetRowRadius = 80;
 let currentAvoid = false;
 let currentAvoidRadius = 80;
-let currentAvoidStrength = 0.15;
+let currentAvoidStrength = 20; // 픽셀 단위
 let currentTextureType: 'image' | 'video' = 'image';
 
 function getMosaicFilterOptions() {
@@ -490,10 +499,9 @@ avoidRadiusSlider.addEventListener('input', (e) => {
 
 // 이동 강도 슬라이더 이벤트 (0.05~0.5, 슬라이더 5~50)
 avoidStrengthSlider.addEventListener('input', (e) => {
-  const raw = parseInt((e.target as HTMLInputElement).value);
-  const strength = raw / 100;
+  const strength = parseInt((e.target as HTMLInputElement).value);
   currentAvoidStrength = strength;
-  avoidStrengthValue.textContent = strength.toFixed(2);
+  avoidStrengthValue.textContent = strength.toString();
   if (mosaic.isAsciiMosaicFilterEnabled()) {
     mosaic.setAvoidStrength(strength);
   }
@@ -1132,8 +1140,8 @@ function applyStateToUI(): void {
   avoidCheckbox.checked = currentAvoid;
   avoidRadiusSlider.value = currentAvoidRadius.toString();
   avoidRadiusValue.textContent = currentAvoidRadius.toString();
-  avoidStrengthSlider.value = (currentAvoidStrength * 100).toString();
-  avoidStrengthValue.textContent = currentAvoidStrength.toFixed(2);
+  avoidStrengthSlider.value = currentAvoidStrength.toString();
+  avoidStrengthValue.textContent = currentAvoidStrength.toString();
   shapeSelect.value = currentShape;
   sphereRadiusSlider.value = currentRadius.toString();
   sphereRadiusValue.textContent = currentRadius.toFixed(1);
