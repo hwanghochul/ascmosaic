@@ -38,6 +38,10 @@ export interface AsciiMosaicFilterOptions {
   avoidStrength?: number;
   /** 셀 순서조정: 회피하기 시 z 위치와 알파 디스카드로 순서 조정 (기본값: false) */
   adjustCellOrder?: boolean;
+  /** 최소 밝기 (0~100, 기본값: 20) */
+  minBrightness?: number;
+  /** 최대 밝기 (0~100, 기본값: 80) */
+  maxBrightness?: number;
 }
 
 /**
@@ -74,6 +78,8 @@ export class AsciiMosaicFilter {
   private avoidRadius: number;
   private avoidStrength: number;
   private adjustCellOrder: boolean;
+  private minBrightness: number;
+  private maxBrightness: number;
   private mouseX: number = -10000;
   private mouseY: number = -10000;
   private mouseIsInside: boolean = false;
@@ -138,6 +144,8 @@ export class AsciiMosaicFilter {
     uniform float uOffsetRowRadius;
     uniform float uEffectiveOffsetRowStrength;
     uniform float uAdjustCellOrder;
+    uniform float uMinBrightness;
+    uniform float uMaxBrightness;
     
     varying vec2 vSampleUV;
     varying vec2 vLocalUV;
@@ -171,7 +179,13 @@ export class AsciiMosaicFilter {
       float noisyBrightness = brightness + noiseValue;
       noisyBrightness = clamp(noisyBrightness, 0.0, 1.0);
       
-      float invertedBrightness = 1.0 - noisyBrightness;
+      // 최소/최대 밝기 범위로 remap (0~100을 0.0~1.0으로 변환)
+      float minBrightnessNorm = uMinBrightness / 100.0;
+      float maxBrightnessNorm = uMaxBrightness / 100.0;
+      float remappedBrightness = minBrightnessNorm + noisyBrightness * (maxBrightnessNorm - minBrightnessNorm);
+      remappedBrightness = clamp(remappedBrightness, 0.0, 1.0);
+      
+      float invertedBrightness = 1.0 - remappedBrightness;
       float cellIndex = floor(invertedBrightness * uCellCount);
       cellIndex = clamp(cellIndex, 0.0, uCellCount - 1.0);
       
@@ -243,6 +257,8 @@ export class AsciiMosaicFilter {
     this.avoidRadius = Math.max(0, options.avoidRadius ?? 80);
     this.avoidStrength = Math.max(0, options.avoidStrength ?? 0.15);
     this.adjustCellOrder = options.adjustCellOrder ?? false;
+    this.minBrightness = Math.max(0, Math.min(100, options.minBrightness ?? 20));
+    this.maxBrightness = Math.max(0, Math.min(100, options.maxBrightness ?? 80));
     this.lastNoiseUpdateTime = performance.now();
 
     this.renderTarget = new THREE.WebGLRenderTarget(width, height, {
@@ -330,6 +346,8 @@ export class AsciiMosaicFilter {
         uAvoidRadius: { value: this.avoidRadius },
         uAvoidStrength: { value: this.avoidStrength },
         uAdjustCellOrder: { value: (this.avoid && this.adjustCellOrder) ? 1 : 0 },
+        uMinBrightness: { value: this.minBrightness },
+        uMaxBrightness: { value: this.maxBrightness },
       },
       vertexShader: AsciiMosaicFilter.VERTEX_SHADER,
       fragmentShader: AsciiMosaicFilter.FRAGMENT_SHADER,
@@ -503,6 +521,8 @@ export class AsciiMosaicFilter {
     this.material.uniforms.uAvoidEnabled.value = this.avoid ? 1 : 0;
     this.material.uniforms.uAvoidRadius.value = this.avoidRadius;
     this.material.uniforms.uOffsetRowRadius.value = this.offsetRowRadius;
+    this.material.uniforms.uMinBrightness.value = this.minBrightness;
+    this.material.uniforms.uMaxBrightness.value = this.maxBrightness;
 
     const now = performance.now();
     const deltaSec = this.lastRenderTime > 0 ? (now - this.lastRenderTime) / 1000 : 0.016;
@@ -650,6 +670,20 @@ export class AsciiMosaicFilter {
     this.avoidStrength = Math.max(0, strength);
     if (this.material) {
       this.material.uniforms.uAvoidStrength.value = this.avoidStrength;
+    }
+  }
+
+  setMinBrightness(brightness: number): void {
+    this.minBrightness = Math.max(0, Math.min(100, brightness));
+    if (this.material) {
+      this.material.uniforms.uMinBrightness.value = this.minBrightness;
+    }
+  }
+
+  setMaxBrightness(brightness: number): void {
+    this.maxBrightness = Math.max(0, Math.min(100, brightness));
+    if (this.material) {
+      this.material.uniforms.uMaxBrightness.value = this.maxBrightness;
     }
   }
 

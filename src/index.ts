@@ -576,6 +576,24 @@ export class AscMosaic {
   }
 
   /**
+   * 최소 밝기를 설정합니다 (0~100)
+   */
+  setMinBrightness(brightness: number): void {
+    if (this.asciiMosaicFilter) {
+      this.asciiMosaicFilter.setMinBrightness(brightness);
+    }
+  }
+
+  /**
+   * 최대 밝기를 설정합니다 (0~100)
+   */
+  setMaxBrightness(brightness: number): void {
+    if (this.asciiMosaicFilter) {
+      this.asciiMosaicFilter.setMaxBrightness(brightness);
+    }
+  }
+
+  /**
    * 세트변경(offsetRow) 마우스 영향 범위(픽셀) 설정
    */
   setOffsetRowRadius(radius: number): void {

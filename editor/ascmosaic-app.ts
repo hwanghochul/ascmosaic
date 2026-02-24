@@ -69,6 +69,8 @@ interface InstanceConfig {
   offsetRowRadius?: number;
   noiseIntensity?: number;
   noiseFPS?: number;
+  minBrightness?: number;
+  maxBrightness?: number;
   avoid?: boolean;
   avoidRadius?: number;
   avoidStrength?: number;
@@ -180,6 +182,8 @@ async function initContainer(container: HTMLElement): Promise<AscMosaic | null> 
     offsetRowRadius: config.offsetRowRadius ?? 80,
     noiseIntensity: config.noiseIntensity ?? 0,
     noiseFPS: config.noiseFPS ?? 10,
+    minBrightness: config.minBrightness ?? 20,
+    maxBrightness: config.maxBrightness ?? 80,
     avoid: config.avoid ?? false,
     avoidRadius: config.avoidRadius ?? 80,
     avoidStrength: config.avoidStrength ?? 20, // 픽셀 단위

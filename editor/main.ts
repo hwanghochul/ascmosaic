@@ -48,6 +48,11 @@ const setConfigContainer = document.getElementById('set-config-container')!;
 const setCountSlider = document.getElementById('set-count-slider')! as HTMLInputElement;
 const setCountValue = document.getElementById('set-count-value')!;
 const setSelectionModeSelect = document.getElementById('set-selection-mode-select')! as HTMLSelectElement;
+const brightnessContainer = document.getElementById('brightness-container')!;
+const minBrightnessSlider = document.getElementById('min-brightness-slider')! as HTMLInputElement;
+const minBrightnessValue = document.getElementById('min-brightness-value')!;
+const maxBrightnessSlider = document.getElementById('max-brightness-slider')! as HTMLInputElement;
+const maxBrightnessValue = document.getElementById('max-brightness-value')!;
 const offsetRowRadiusContainer = document.getElementById('offset-row-radius-container')!;
 const offsetRowRadiusSlider = document.getElementById('offset-row-radius-slider')! as HTMLInputElement;
 const offsetRowRadiusValue = document.getElementById('offset-row-radius-value')!;
@@ -275,6 +280,8 @@ let currentMosaicSize = 10;
 let currentNoiseIntensity = 0.0;
 let currentNoiseFPS = 10;
 let currentCellCount = 6;
+let currentMinBrightness = 20;
+let currentMaxBrightness = 80;
 let currentCellUrl = '/resource/mosaic_cell.png';
 let currentEarthTextureUrl = '/resource/earth.jpg';
 let currentShape: ShapeType = 'sphere';
@@ -312,6 +319,8 @@ function getMosaicFilterOptions() {
     avoidRadius: currentAvoidRadius,
     avoidStrength: currentAvoidStrength,
     adjustCellOrder: currentAdjustCellOrder,
+    minBrightness: currentMinBrightness,
+    maxBrightness: currentMaxBrightness,
   };
 }
 
@@ -368,6 +377,7 @@ asciiToggleBtn.addEventListener('click', async () => {
       cellCountContainer.style.display = 'flex';
       cellSelectContainer.style.display = 'flex';
       setConfigContainer.style.display = 'block';
+      brightnessContainer.style.display = 'block';
       avoidContainer.style.display = 'flex';
       avoidRadiusContainer.style.display = currentAvoid ? 'flex' : 'none';
       avoidStrengthContainer.style.display = currentAvoid ? 'flex' : 'none';
@@ -379,6 +389,8 @@ asciiToggleBtn.addEventListener('click', async () => {
       mosaic.setAvoid(currentAvoid);
       mosaic.setAvoidRadius(currentAvoidRadius);
       mosaic.setAvoidStrength(currentAvoidStrength);
+      mosaic.setMinBrightness(currentMinBrightness);
+      mosaic.setMaxBrightness(currentMaxBrightness);
       const filter = mosaic.getAsciiMosaicFilter();
       if (filter) {
         (filter as any).setAdjustCellOrder(currentAdjustCellOrder);
@@ -393,6 +405,7 @@ asciiToggleBtn.addEventListener('click', async () => {
       cellCountContainer.style.display = 'none';
       cellSelectContainer.style.display = 'none';
       setConfigContainer.style.display = 'none';
+      brightnessContainer.style.display = 'none';
       avoidContainer.style.display = 'none';
       avoidRadiusContainer.style.display = 'none';
       avoidStrengthContainer.style.display = 'none';
@@ -474,6 +487,28 @@ setSelectionModeSelect.addEventListener('change', () => {
   if (mosaic.isAsciiMosaicFilterEnabled()) {
     mosaic.setSetSelectionMode(currentSetSelectionMode);
     mosaic.setOffsetRowRadius(currentOffsetRowRadius);
+  }
+  updateHTMLCodeIfRealtime();
+});
+
+// 최소 밝기 슬라이더 이벤트
+minBrightnessSlider.addEventListener('input', (e) => {
+  const brightness = parseInt((e.target as HTMLInputElement).value);
+  currentMinBrightness = brightness;
+  minBrightnessValue.textContent = brightness.toString();
+  if (mosaic.isAsciiMosaicFilterEnabled()) {
+    mosaic.setMinBrightness(brightness);
+  }
+  updateHTMLCodeIfRealtime();
+});
+
+// 최대 밝기 슬라이더 이벤트
+maxBrightnessSlider.addEventListener('input', (e) => {
+  const brightness = parseInt((e.target as HTMLInputElement).value);
+  currentMaxBrightness = brightness;
+  maxBrightnessValue.textContent = brightness.toString();
+  if (mosaic.isAsciiMosaicFilterEnabled()) {
+    mosaic.setMaxBrightness(brightness);
   }
   updateHTMLCodeIfRealtime();
 });
@@ -883,6 +918,8 @@ function generateHTMLCode(): string {
   if (currentSetSelectionMode === 'offsetRow') config.offsetRowRadius = currentOffsetRowRadius;
   if (currentNoiseIntensity !== 0) config.noiseIntensity = currentNoiseIntensity;
   if (currentNoiseFPS !== 10) config.noiseFPS = currentNoiseFPS;
+  if (currentMinBrightness !== 20) config.minBrightness = currentMinBrightness;
+  if (currentMaxBrightness !== 80) config.maxBrightness = currentMaxBrightness;
   if (currentAvoid) {
     config.avoid = true;
     config.avoidRadius = currentAvoidRadius;
@@ -1191,6 +1228,10 @@ function applyStateToUI(): void {
   avoidStrengthValue.textContent = currentAvoidStrength.toString();
   adjustCellOrderCheckbox.checked = currentAdjustCellOrder;
   adjustCellOrderContainer.style.display = currentAvoid ? 'flex' : 'none';
+  minBrightnessSlider.value = currentMinBrightness.toString();
+  minBrightnessValue.textContent = currentMinBrightness.toString();
+  maxBrightnessSlider.value = currentMaxBrightness.toString();
+  maxBrightnessValue.textContent = currentMaxBrightness.toString();
   shapeSelect.value = currentShape;
   sphereRadiusSlider.value = currentRadius.toString();
   sphereRadiusValue.textContent = currentRadius.toFixed(1);
@@ -1292,6 +1333,7 @@ loadResourceList().then(async () => {
       cellCountContainer.style.display = 'flex';
       cellSelectContainer.style.display = 'flex';
       setConfigContainer.style.display = 'block';
+      brightnessContainer.style.display = 'block';
       avoidContainer.style.display = 'flex';
       avoidRadiusContainer.style.display = currentAvoid ? 'flex' : 'none';
       avoidStrengthContainer.style.display = currentAvoid ? 'flex' : 'none';
