@@ -24,7 +24,7 @@ export interface AsciiMosaicFilterOptions {
   noiseIntensity?: number;
   /** 노이즈 업데이트 FPS (기본값: 15) */
   noiseFPS?: number;
-  /** 노이즈 FPS 랜덤 업데이트 (0~1, 기본값: 0). 0이면 정확한 간격, 1에 가까울수록 랜덤 */
+  /** 노이즈 FPS 랜덤 업데이트 (0~5초, 기본값: 0). 0이면 정확한 간격, 값만큼의 초 단위 랜덤 시간 추가 */
   noiseFPSRandom?: number;
   /** 세트(행) 개수 - 셀 이미지를 나눌 행 개수 (기본값: 1) */
   setCount?: number;
@@ -69,6 +69,8 @@ export class AsciiMosaicFilter {
   private effectiveOffsetRowStrength: number = 0;
   private time: number = 0.0;
   private lastNoiseUpdateTime: number = 0.0;
+  /** 다음 노이즈 업데이트 시각 (0이면 아직 미설정) */
+  private nextNoiseUpdateTime: number = 0;
   private isEnabled: boolean = false;
   private width: number;
   private height: number;
@@ -253,7 +255,7 @@ export class AsciiMosaicFilter {
     this.mosaicSize = options.mosaicSize ?? 8;
     this.noiseIntensity = options.noiseIntensity ?? 0.0;
     this.noiseFPS = options.noiseFPS ?? 15;
-    this.noiseFPSRandom = Math.max(0, Math.min(1, options.noiseFPSRandom ?? 0));
+    this.noiseFPSRandom = Math.max(0, Math.min(5, options.noiseFPSRandom ?? 0));
     this.setCount = Math.max(1, options.setCount ?? 1);
     this.setSelectionMode = options.setSelectionMode ?? 'first';
     this.offsetRowRadius = Math.max(0, options.offsetRowRadius ?? 80);
@@ -503,17 +505,18 @@ export class AsciiMosaicFilter {
     if (!this.material || !this.instancedMesh || !this.atlasResult) return;
 
     const currentTime = performance.now();
-    const timeDelta = currentTime - this.lastNoiseUpdateTime;
     const minInterval = 1000.0 / this.noiseFPS;
-    const randomOffset =
-      this.noiseFPSRandom > 0
-        ? Math.random() * minInterval * this.noiseFPSRandom
-        : 0;
-    const actualInterval = minInterval + randomOffset;
-    if (timeDelta >= actualInterval) {
+    const shouldUpdate =
+      this.nextNoiseUpdateTime === 0 || currentTime >= this.nextNoiseUpdateTime;
+    if (shouldUpdate) {
       this.time = currentTime * 0.001;
       this.lastNoiseUpdateTime = currentTime;
       if (this.material) this.material.uniforms.uTime.value = this.time;
+      const randomOffset =
+        this.noiseFPSRandom > 0
+          ? Math.random() * this.noiseFPSRandom * 1000
+          : 0;
+      this.nextNoiseUpdateTime = currentTime + minInterval + randomOffset;
     }
 
     this.material.uniforms.tDiffuse.value = this.renderTarget.texture;
@@ -619,10 +622,12 @@ export class AsciiMosaicFilter {
   setNoiseFPS(fps: number): void {
     this.noiseFPS = Math.max(1.0, fps);
     this.lastNoiseUpdateTime = performance.now();
+    this.nextNoiseUpdateTime = 0;
   }
 
   setNoiseFPSRandom(random: number): void {
-    this.noiseFPSRandom = Math.max(0, Math.min(1, random));
+    this.noiseFPSRandom = Math.max(0, Math.min(5, random));
+    this.nextNoiseUpdateTime = 0;
   }
 
   setSetCount(setCount: number): void {

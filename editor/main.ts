@@ -474,8 +474,8 @@ noiseFPSSlider.addEventListener('input', (e) => {
 // 노이즈 FPS 랜덤 슬라이더 이벤트
 noiseFPSRandomSlider.addEventListener('input', (e) => {
   const value = parseInt((e.target as HTMLInputElement).value);
-  currentNoiseFPSRandom = value / 100;
-  noiseFPSRandomValue.textContent = currentNoiseFPSRandom.toFixed(2);
+  currentNoiseFPSRandom = value / 10;
+  noiseFPSRandomValue.textContent = currentNoiseFPSRandom.toFixed(1);
   if (mosaic.isAsciiMosaicFilterEnabled()) {
     mosaic.setNoiseFPSRandom(currentNoiseFPSRandom);
   }
@@ -1243,8 +1243,8 @@ function applyStateToUI(): void {
   noiseIntensityValue.textContent = currentNoiseIntensity.toFixed(2);
   noiseFPSSlider.value = currentNoiseFPS.toString();
   noiseFPSValue.textContent = currentNoiseFPS.toString();
-  noiseFPSRandomSlider.value = (currentNoiseFPSRandom * 100).toString();
-  noiseFPSRandomValue.textContent = currentNoiseFPSRandom.toFixed(2);
+  noiseFPSRandomSlider.value = (currentNoiseFPSRandom * 10).toString();
+  noiseFPSRandomValue.textContent = currentNoiseFPSRandom.toFixed(1);
   cellCountSlider.value = currentCellCount.toString();
   cellCountValue.textContent = currentCellCount.toString();
   setCountSlider.value = currentSetCount.toString();
