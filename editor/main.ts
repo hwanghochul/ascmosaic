@@ -175,62 +175,67 @@ function loadStateFromURL(): boolean {
   }
 }
 
-// 상태를 URL에 저장
+// URL 저장 디바운스 (너무 자주 호출되면 브라우저가 네비게이션 스로틀링 경고를 냄)
+let saveStateToURLTimeoutId: ReturnType<typeof setTimeout> | null = null;
+const SAVE_STATE_DEBOUNCE_MS = 400;
+
+// 상태를 URL에 저장 (디바운스 적용)
 function saveStateToURL(): void {
-  const state = {
-    mosaicSize: currentMosaicSize,
-    noiseIntensity: currentNoiseIntensity,
-    noiseFPS: currentNoiseFPS,
-    noiseFPSRandom: currentNoiseFPSRandom,
-    cellCount: currentCellCount,
-    cellUrl: currentCellUrl,
-    setCount: currentSetCount,
-    setSelectionMode: currentSetSelectionMode,
-    offsetRowRadius: currentOffsetRowRadius,
-    avoid: currentAvoid,
-    avoidRadius: currentAvoidRadius,
-    avoidStrength: currentAvoidStrength,
-    adjustCellOrder: currentAdjustCellOrder,
-    minBrightness: currentMinBrightness,
-    maxBrightness: currentMaxBrightness,
-    textureType: currentTextureType,
-    shape: currentShape,
-    radius: currentRadius,
-    cubeSize: currentCubeSize,
-    planeWidth: currentPlaneWidth,
-    planeHeight: currentPlaneHeight,
-    modelUrl: currentModelUrl,
-    scale: currentScale,
-    textureUrl: currentEarthTextureUrl,
-    controlMode: currentControlMode,
-    tiltInvertX: currentTiltInvertX,
-    tiltInvertY: currentTiltInvertY,
-    tiltMaxAngle: currentTiltMaxAngle,
-    tiltSmoothness: currentTiltSmoothness,
-    canvasWidth: currentCanvasWidth,
-    canvasHeight: currentCanvasHeight,
-    realTimeCodeGen: realTimeCodeGen,
-    backgroundColor: currentBackgroundColor,
-  };
-  
-  // 카메라 상태 저장 (OrbitControls가 활성화되어 있을 때만)
-  const orbitControls = mosaic.getOrbitControls();
-  if (orbitControls && currentControlMode === 'orbit') {
-    const cameraState = orbitControls.getCameraState();
-    (state as any).cameraTarget = {
-      x: cameraState.target.x,
-      y: cameraState.target.y,
-      z: cameraState.target.z,
+  if (saveStateToURLTimeoutId !== null) clearTimeout(saveStateToURLTimeoutId);
+  saveStateToURLTimeoutId = setTimeout(() => {
+    saveStateToURLTimeoutId = null;
+    const state = {
+      mosaicSize: currentMosaicSize,
+      noiseIntensity: currentNoiseIntensity,
+      noiseFPS: currentNoiseFPS,
+      noiseFPSRandom: currentNoiseFPSRandom,
+      cellCount: currentCellCount,
+      cellUrl: currentCellUrl,
+      setCount: currentSetCount,
+      setSelectionMode: currentSetSelectionMode,
+      offsetRowRadius: currentOffsetRowRadius,
+      avoid: currentAvoid,
+      avoidRadius: currentAvoidRadius,
+      avoidStrength: currentAvoidStrength,
+      adjustCellOrder: currentAdjustCellOrder,
+      minBrightness: currentMinBrightness,
+      maxBrightness: currentMaxBrightness,
+      textureType: currentTextureType,
+      shape: currentShape,
+      radius: currentRadius,
+      cubeSize: currentCubeSize,
+      planeWidth: currentPlaneWidth,
+      planeHeight: currentPlaneHeight,
+      modelUrl: currentModelUrl,
+      scale: currentScale,
+      textureUrl: currentEarthTextureUrl,
+      controlMode: currentControlMode,
+      tiltInvertX: currentTiltInvertX,
+      tiltInvertY: currentTiltInvertY,
+      tiltMaxAngle: currentTiltMaxAngle,
+      tiltSmoothness: currentTiltSmoothness,
+      canvasWidth: currentCanvasWidth,
+      canvasHeight: currentCanvasHeight,
+      realTimeCodeGen: realTimeCodeGen,
+      backgroundColor: currentBackgroundColor,
     };
-    (state as any).cameraDistance = cameraState.distance;
-    (state as any).cameraTheta = cameraState.theta;
-    (state as any).cameraPhi = cameraState.phi;
-  }
-  
-  const stateJson = encodeURIComponent(JSON.stringify(state));
-  const newUrl = new URL(window.location.href);
-  newUrl.searchParams.set('state', stateJson);
-  window.history.replaceState({}, '', newUrl.toString());
+    const orbitControls = mosaic.getOrbitControls();
+    if (orbitControls && currentControlMode === 'orbit') {
+      const cameraState = orbitControls.getCameraState();
+      (state as any).cameraTarget = {
+        x: cameraState.target.x,
+        y: cameraState.target.y,
+        z: cameraState.target.z,
+      };
+      (state as any).cameraDistance = cameraState.distance;
+      (state as any).cameraTheta = cameraState.theta;
+      (state as any).cameraPhi = cameraState.phi;
+    }
+    const stateJson = encodeURIComponent(JSON.stringify(state));
+    const newUrl = new URL(window.location.href);
+    newUrl.searchParams.set('state', stateJson);
+    window.history.replaceState({}, '', newUrl.toString());
+  }, SAVE_STATE_DEBOUNCE_MS);
 }
 
 // 아코디언 초기화
