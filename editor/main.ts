@@ -12,6 +12,9 @@ const noiseIntensityValue = document.getElementById('noise-intensity-value')!;
 const noiseFPSContainer = document.getElementById('noise-fps-container')!;
 const noiseFPSSlider = document.getElementById('noise-fps-slider')! as HTMLInputElement;
 const noiseFPSValue = document.getElementById('noise-fps-value')!;
+const noiseFPSRandomContainer = document.getElementById('noise-fps-random-container')!;
+const noiseFPSRandomSlider = document.getElementById('noise-fps-random-slider')! as HTMLInputElement;
+const noiseFPSRandomValue = document.getElementById('noise-fps-random-value')!;
 const cellSelectContainer = document.getElementById('cell-select-container')!;
 const cellSelect = document.getElementById('cell-select')! as HTMLSelectElement;
 const shapeSelect = document.getElementById('shape-select')! as HTMLSelectElement;
@@ -114,6 +117,7 @@ function loadStateFromURL(): boolean {
     if (state.mosaicSize !== undefined) currentMosaicSize = state.mosaicSize;
     if (state.noiseIntensity !== undefined) currentNoiseIntensity = state.noiseIntensity;
     if (state.noiseFPS !== undefined) currentNoiseFPS = state.noiseFPS;
+    if (state.noiseFPSRandom !== undefined) currentNoiseFPSRandom = state.noiseFPSRandom;
     if (state.cellCount !== undefined) currentCellCount = state.cellCount;
     if (state.cellUrl !== undefined) currentCellUrl = state.cellUrl;
     if (state.setCount !== undefined) currentSetCount = state.setCount;
@@ -177,6 +181,7 @@ function saveStateToURL(): void {
     mosaicSize: currentMosaicSize,
     noiseIntensity: currentNoiseIntensity,
     noiseFPS: currentNoiseFPS,
+    noiseFPSRandom: currentNoiseFPSRandom,
     cellCount: currentCellCount,
     cellUrl: currentCellUrl,
     setCount: currentSetCount,
@@ -284,6 +289,7 @@ type ShapeType = 'sphere' | 'cube' | 'plane' | 'glb';
 let currentMosaicSize = 10;
 let currentNoiseIntensity = 0.0;
 let currentNoiseFPS = 10;
+let currentNoiseFPSRandom = 0;
 let currentCellCount = 6;
 let currentMinBrightness = 20;
 let currentMaxBrightness = 80;
@@ -317,6 +323,7 @@ function getMosaicFilterOptions() {
     cellCount: currentCellCount,
     noiseIntensity: currentNoiseIntensity,
     noiseFPS: currentNoiseFPS,
+    noiseFPSRandom: currentNoiseFPSRandom,
     setCount: currentSetCount,
     setSelectionMode: currentSetSelectionMode,
     offsetRowRadius: currentOffsetRowRadius,
@@ -379,6 +386,7 @@ asciiToggleBtn.addEventListener('click', async () => {
       pixelSizeContainer.style.display = 'flex';
       noiseIntensityContainer.style.display = 'flex';
       noiseFPSContainer.style.display = 'flex';
+      noiseFPSRandomContainer.style.display = 'flex';
       cellCountContainer.style.display = 'flex';
       cellSelectContainer.style.display = 'flex';
       setConfigContainer.style.display = 'block';
@@ -407,6 +415,7 @@ asciiToggleBtn.addEventListener('click', async () => {
       pixelSizeContainer.style.display = 'none';
       noiseIntensityContainer.style.display = 'none';
       noiseFPSContainer.style.display = 'none';
+      noiseFPSRandomContainer.style.display = 'none';
       cellCountContainer.style.display = 'none';
       cellSelectContainer.style.display = 'none';
       setConfigContainer.style.display = 'none';
@@ -458,6 +467,19 @@ noiseFPSSlider.addEventListener('input', (e) => {
   if (mosaic.isAsciiMosaicFilterEnabled()) {
     mosaic.setNoiseFPS(fps);
   }
+  saveStateToURL();
+  updateHTMLCodeIfRealtime();
+});
+
+// 노이즈 FPS 랜덤 슬라이더 이벤트
+noiseFPSRandomSlider.addEventListener('input', (e) => {
+  const value = parseInt((e.target as HTMLInputElement).value);
+  currentNoiseFPSRandom = value / 100;
+  noiseFPSRandomValue.textContent = currentNoiseFPSRandom.toFixed(2);
+  if (mosaic.isAsciiMosaicFilterEnabled()) {
+    mosaic.setNoiseFPSRandom(currentNoiseFPSRandom);
+  }
+  saveStateToURL();
   updateHTMLCodeIfRealtime();
 });
 
@@ -925,6 +947,7 @@ function generateHTMLCode(): string {
   if (currentSetSelectionMode === 'offsetRow') config.offsetRowRadius = currentOffsetRowRadius;
   if (currentNoiseIntensity !== 0) config.noiseIntensity = currentNoiseIntensity;
   if (currentNoiseFPS !== 10) config.noiseFPS = currentNoiseFPS;
+  if (currentNoiseFPSRandom !== 0) config.noiseFPSRandom = currentNoiseFPSRandom;
   if (currentMinBrightness !== 20) config.minBrightness = currentMinBrightness;
   if (currentMaxBrightness !== 80) config.maxBrightness = currentMaxBrightness;
   if (currentAvoid) {
@@ -1220,6 +1243,8 @@ function applyStateToUI(): void {
   noiseIntensityValue.textContent = currentNoiseIntensity.toFixed(2);
   noiseFPSSlider.value = currentNoiseFPS.toString();
   noiseFPSValue.textContent = currentNoiseFPS.toString();
+  noiseFPSRandomSlider.value = (currentNoiseFPSRandom * 100).toString();
+  noiseFPSRandomValue.textContent = currentNoiseFPSRandom.toFixed(2);
   cellCountSlider.value = currentCellCount.toString();
   cellCountValue.textContent = currentCellCount.toString();
   setCountSlider.value = currentSetCount.toString();
@@ -1337,6 +1362,7 @@ loadResourceList().then(async () => {
       pixelSizeContainer.style.display = 'flex';
       noiseIntensityContainer.style.display = 'flex';
       noiseFPSContainer.style.display = 'flex';
+      noiseFPSRandomContainer.style.display = 'flex';
       cellCountContainer.style.display = 'flex';
       cellSelectContainer.style.display = 'flex';
       setConfigContainer.style.display = 'block';
@@ -1353,6 +1379,7 @@ loadResourceList().then(async () => {
       mosaic.setAvoidStrength(currentAvoidStrength);
       mosaic.setMinBrightness(currentMinBrightness);
       mosaic.setMaxBrightness(currentMaxBrightness);
+      mosaic.setNoiseFPSRandom(currentNoiseFPSRandom);
       const filter = mosaic.getAsciiMosaicFilter();
       if (filter) {
         (filter as any).setAdjustCellOrder(currentAdjustCellOrder);

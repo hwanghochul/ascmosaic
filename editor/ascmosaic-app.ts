@@ -69,6 +69,7 @@ interface InstanceConfig {
   offsetRowRadius?: number;
   noiseIntensity?: number;
   noiseFPS?: number;
+  noiseFPSRandom?: number;
   minBrightness?: number;
   maxBrightness?: number;
   avoid?: boolean;
@@ -182,6 +183,7 @@ async function initContainer(container: HTMLElement): Promise<AscMosaic | null> 
     offsetRowRadius: config.offsetRowRadius ?? 80,
     noiseIntensity: config.noiseIntensity ?? 0,
     noiseFPS: config.noiseFPS ?? 10,
+    noiseFPSRandom: config.noiseFPSRandom ?? 0,
     minBrightness: config.minBrightness ?? 20,
     maxBrightness: config.maxBrightness ?? 80,
     avoid: config.avoid ?? false,

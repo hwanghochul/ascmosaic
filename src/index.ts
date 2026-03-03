@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import {
   AsciiMosaicFilter,
   AsciiMosaicFilterOptions,
@@ -557,6 +556,15 @@ export class AscMosaic {
     }
   }
 
+  /**
+   * 노이즈 FPS 랜덤 업데이트 비율을 설정합니다 (0~1)
+   */
+  setNoiseFPSRandom(random: number): void {
+    if (this.asciiMosaicFilter) {
+      this.asciiMosaicFilter.setNoiseFPSRandom(random);
+    }
+  }
+  
   /**
    * 모자이크 세트 개수를 설정합니다
    */

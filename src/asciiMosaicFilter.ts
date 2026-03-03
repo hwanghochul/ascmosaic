@@ -24,6 +24,8 @@ export interface AsciiMosaicFilterOptions {
   noiseIntensity?: number;
   /** 노이즈 업데이트 FPS (기본값: 15) */
   noiseFPS?: number;
+  /** 노이즈 FPS 랜덤 업데이트 (0~1, 기본값: 0). 0이면 정확한 간격, 1에 가까울수록 랜덤 */
+  noiseFPSRandom?: number;
   /** 세트(행) 개수 - 셀 이미지를 나눌 행 개수 (기본값: 1) */
   setCount?: number;
   /** 세트 선택 모드 (기본값: 'first') */
@@ -59,6 +61,7 @@ export class AsciiMosaicFilter {
   private mosaicSize: number;
   private noiseIntensity: number;
   private noiseFPS: number;
+  private noiseFPSRandom: number;
   private setCount: number;
   private setSelectionMode: 'first' | 'random' | 'cycle' | 'offsetRow';
   private offsetRowRadius: number;
@@ -250,6 +253,7 @@ export class AsciiMosaicFilter {
     this.mosaicSize = options.mosaicSize ?? 8;
     this.noiseIntensity = options.noiseIntensity ?? 0.0;
     this.noiseFPS = options.noiseFPS ?? 15;
+    this.noiseFPSRandom = Math.max(0, Math.min(1, options.noiseFPSRandom ?? 0));
     this.setCount = Math.max(1, options.setCount ?? 1);
     this.setSelectionMode = options.setSelectionMode ?? 'first';
     this.offsetRowRadius = Math.max(0, options.offsetRowRadius ?? 80);
@@ -501,7 +505,12 @@ export class AsciiMosaicFilter {
     const currentTime = performance.now();
     const timeDelta = currentTime - this.lastNoiseUpdateTime;
     const minInterval = 1000.0 / this.noiseFPS;
-    if (timeDelta >= minInterval) {
+    const randomOffset =
+      this.noiseFPSRandom > 0
+        ? Math.random() * minInterval * this.noiseFPSRandom
+        : 0;
+    const actualInterval = minInterval + randomOffset;
+    if (timeDelta >= actualInterval) {
       this.time = currentTime * 0.001;
       this.lastNoiseUpdateTime = currentTime;
       if (this.material) this.material.uniforms.uTime.value = this.time;
@@ -610,6 +619,10 @@ export class AsciiMosaicFilter {
   setNoiseFPS(fps: number): void {
     this.noiseFPS = Math.max(1.0, fps);
     this.lastNoiseUpdateTime = performance.now();
+  }
+
+  setNoiseFPSRandom(random: number): void {
+    this.noiseFPSRandom = Math.max(0, Math.min(1, random));
   }
 
   setSetCount(setCount: number): void {
