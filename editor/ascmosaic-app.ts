@@ -31,6 +31,8 @@ declare global {
       adjustCellOrder?: boolean;
       cameraPosition?: { x: number; y: number; z: number };
       cameraRotation?: { x: number; y: number; z: number };
+      orthographic?: boolean;
+      orthoZoom?: number;
       controlMode?: 'orbit' | 'fixed' | 'tilt';
       tiltInvertX?: boolean;
       tiltInvertY?: boolean;
@@ -78,6 +80,8 @@ interface InstanceConfig {
   adjustCellOrder?: boolean;
   cameraPosition?: { x: number; y: number; z: number };
   cameraRotation?: { x: number; y: number; z: number };
+  orthographic?: boolean;
+  orthoZoom?: number;
   controlMode?: 'orbit' | 'fixed' | 'tilt';
   tiltInvertX?: boolean;
   tiltInvertY?: boolean;
@@ -101,7 +105,7 @@ async function initContainer(container: HTMLElement): Promise<AscMosaic | null> 
   }
   if (!raw && window.ASC_MOSAIC_CONFIG) config = window.ASC_MOSAIC_CONFIG;
 
-  const mosaic = new AscMosaic(container);
+  const mosaic = new AscMosaic(container, { orthographic: config.orthographic ?? false });
   mosaic.addLights();
 
   // 캔버스 크기 설정 (config에 있으면 적용)
@@ -160,6 +164,7 @@ async function initContainer(container: HTMLElement): Promise<AscMosaic | null> 
       maxDistance: 10,
       rotateSpeed: 1.0,
       zoomSpeed: 0.1,
+      orthoZoom: config.orthoZoom,
     });
   } else if (controlMode === 'tilt') {
     const invertX = config.tiltInvertX ?? false;

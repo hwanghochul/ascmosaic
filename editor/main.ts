@@ -92,8 +92,10 @@ const cameraDistanceSlider = document.getElementById('camera-distance-slider')! 
 const cameraDistanceValue = document.getElementById('camera-distance-value')!;
 const cameraFovSlider = document.getElementById('camera-fov-slider')! as HTMLInputElement;
 const cameraFovValue = document.getElementById('camera-fov-value')!;
+const cameraFovContainer = document.getElementById('camera-fov-container')!;
 const cameraResetBtn = document.getElementById('camera-reset-btn')!;
 const cameraOrbitGroup = document.getElementById('camera-orbit-group')!;
+const orthographicCameraCheckbox = document.getElementById('orthographic-camera-checkbox')! as HTMLInputElement;
 const backgroundColorInput = document.getElementById('background-color-input')! as HTMLInputElement;
 
 let realTimeCodeGen = true;
@@ -101,7 +103,7 @@ let currentCameraFov = 75;
 let currentCanvasWidth = 800;
 let currentCanvasHeight = 600;
 let currentBackgroundColor = '#ffffff';
-let lastCameraState: { target: THREE.Vector3; distance: number; theta: number; phi: number } | null = null;
+let lastCameraState: { target: THREE.Vector3; distance: number; theta: number; phi: number; orthoZoom?: number } | null = null;
 let cameraStateSaveTimeout: number | null = null;
 
 // URL에서 상태 복원
@@ -156,6 +158,7 @@ function loadStateFromURL(): boolean {
     if (state.canvasHeight !== undefined) currentCanvasHeight = state.canvasHeight;
     if (state.realTimeCodeGen !== undefined) realTimeCodeGen = state.realTimeCodeGen;
     if (state.backgroundColor !== undefined) currentBackgroundColor = state.backgroundColor;
+    if (state.orthographic !== undefined) currentOrthographic = state.orthographic;
     
     // 카메라 상태 복원
     if (state.cameraTarget && state.cameraDistance !== undefined && 
@@ -166,6 +169,7 @@ function loadStateFromURL(): boolean {
         distance: state.cameraDistance,
         theta: state.cameraTheta,
         phi: state.cameraPhi,
+        orthoZoom: state.orthoZoom,
       };
     }
     
@@ -218,6 +222,7 @@ function saveStateToURL(): void {
       canvasHeight: currentCanvasHeight,
       realTimeCodeGen: realTimeCodeGen,
       backgroundColor: currentBackgroundColor,
+      orthographic: currentOrthographic,
     };
     const orbitControls = mosaic.getOrbitControls();
     if (orbitControls && currentControlMode === 'orbit') {
@@ -230,6 +235,7 @@ function saveStateToURL(): void {
       (state as any).cameraDistance = cameraState.distance;
       (state as any).cameraTheta = cameraState.theta;
       (state as any).cameraPhi = cameraState.phi;
+      if (cameraState.orthoZoom !== undefined) (state as any).orthoZoom = cameraState.orthoZoom;
     }
     const stateJson = encodeURIComponent(JSON.stringify(state));
     const newUrl = new URL(window.location.href);
@@ -320,6 +326,7 @@ let currentAvoidRadius = 80;
 let currentAvoidStrength = 20; // 픽셀 단위
 let currentAdjustCellOrder = false;
 let currentTextureType: 'image' | 'video' = 'image';
+let currentOrthographic = false;
 
 function getMosaicFilterOptions() {
   return {
@@ -815,14 +822,24 @@ cameraDistanceSlider.addEventListener('input', () => {
   applyCameraOrbitFromSliders();
 });
 
-// FOV 슬라이더
+// FOV 슬라이더 (원근 카메라일 때만 적용)
 cameraFovSlider.addEventListener('input', () => {
   const fov = Math.max(10, Math.min(120, parseFloat(cameraFovSlider.value)));
   currentCameraFov = fov;
   cameraFovValue.textContent = String(Math.round(fov));
   const camera = mosaic.getCamera();
-  camera.fov = fov;
-  camera.updateProjectionMatrix();
+  if (camera instanceof THREE.PerspectiveCamera) {
+    camera.fov = fov;
+    camera.updateProjectionMatrix();
+  }
+  updateHTMLCodeIfRealtime();
+});
+
+// 오소 카메라 체크박스
+orthographicCameraCheckbox.addEventListener('change', () => {
+  currentOrthographic = orthographicCameraCheckbox.checked;
+  mosaic.setUseOrthographic(currentOrthographic);
+  saveStateToURL();
   updateHTMLCodeIfRealtime();
 });
 
@@ -973,6 +990,12 @@ function generateHTMLCode(): string {
     y: camera.rotation.y,
     z: camera.rotation.z,
   };
+  if (currentOrthographic) config.orthographic = true;
+  const orbitControls = mosaic.getOrbitControls();
+  if (currentControlMode === 'orbit' && orbitControls && currentOrthographic) {
+    const cameraState = orbitControls.getCameraState();
+    if (cameraState.orthoZoom !== undefined) config.orthoZoom = cameraState.orthoZoom;
+  }
   
   // 컨트롤 모드
   if (currentControlMode !== 'orbit') config.controlMode = currentControlMode;
@@ -1044,7 +1067,8 @@ function resetCamera(): void {
     );
     const theta = 0;
     const phi = Math.PI / 2;
-    orbitControls.setCameraState(center.clone(), distance, theta, phi);
+    const orthoZoom = mosaic.isOrthographic() ? 1 : undefined;
+    orbitControls.setCameraState(center.clone(), distance, theta, phi, orthoZoom);
   } else {
     const distance = Math.max(ORBIT_MIN_DISTANCE, Math.min(ORBIT_MAX_DISTANCE, 5));
     camera.position.set(center.x, center.y, center.z + distance);
@@ -1087,9 +1111,14 @@ function updateCameraControls(): void {
     cameraOrbitGroup.style.display = 'none';
   }
 
-  currentCameraFov = camera.fov;
-  cameraFovSlider.value = String(Math.round(camera.fov));
-  cameraFovValue.textContent = String(Math.round(camera.fov));
+  if (camera instanceof THREE.PerspectiveCamera) {
+    currentCameraFov = camera.fov;
+    cameraFovSlider.value = String(Math.round(camera.fov));
+    cameraFovValue.textContent = String(Math.round(camera.fov));
+    cameraFovContainer.style.display = '';
+  } else {
+    cameraFovContainer.style.display = 'none';
+  }
 }
 
 function checkCameraUpdate(): void {
@@ -1121,7 +1150,8 @@ function checkCameraUpdate(): void {
       Math.abs(currentState.target.z - lastCameraState.target.z) > 0.001 ||
       Math.abs(currentState.distance - lastCameraState.distance) > 0.001 ||
       Math.abs(currentState.theta - lastCameraState.theta) > 0.001 ||
-      Math.abs(currentState.phi - lastCameraState.phi) > 0.001;
+      Math.abs(currentState.phi - lastCameraState.phi) > 0.001 ||
+      (currentState.orthoZoom != null && lastCameraState.orthoZoom != null && Math.abs(currentState.orthoZoom - lastCameraState.orthoZoom) > 0.001);
     
     if (stateChanged) {
       lastCameraState = {
@@ -1129,6 +1159,7 @@ function checkCameraUpdate(): void {
         distance: currentState.distance,
         theta: currentState.theta,
         phi: currentState.phi,
+        orthoZoom: currentState.orthoZoom,
       };
       
       // 디바운스: 500ms 후에 URL 저장
@@ -1298,6 +1329,7 @@ function applyStateToUI(): void {
   generateHtmlBtn.style.display = realTimeCodeGen ? 'none' : 'inline-block';
   backgroundColorInput.value = currentBackgroundColor;
   canvasContainer.style.backgroundColor = currentBackgroundColor;
+  orthographicCameraCheckbox.checked = currentOrthographic;
   updateCameraControls();
 }
 
@@ -1314,6 +1346,9 @@ loadResourceList().then(async () => {
     showShapeParams(currentShape);
     await applyModel();
     
+    // 오소 카메라 적용 (오비트 설정 전에 카메라 타입 적용)
+    mosaic.setUseOrthographic(currentOrthographic);
+    
     // 컨트롤 모드 적용
     if (currentControlMode === 'orbit') {
       mosaic.disableTiltControls();
@@ -1322,6 +1357,7 @@ loadResourceList().then(async () => {
         maxDistance: 10,
         rotateSpeed: 1.0,
         zoomSpeed: 0.1,
+        orthoZoom: (window as any).__restoreCameraState?.orthoZoom,
       });
       
       // 카메라 상태 복원
@@ -1338,7 +1374,8 @@ loadResourceList().then(async () => {
             target,
             restoreCameraState.distance,
             restoreCameraState.theta,
-            restoreCameraState.phi
+            restoreCameraState.phi,
+            restoreCameraState.orthoZoom
           );
         }
         delete (window as any).__restoreCameraState;

@@ -5,17 +5,24 @@ import {
 import { createTexturedMesh, TexturedMeshOptions } from './texturedMesh';
 import { OrbitControls, OrbitControlsOptions } from './orbitControls';
 
+/** AscMosaic 생성 옵션 */
+export interface AscMosaicOptions {
+  /** true면 오소(Orthographic) 카메라 사용, 기본값: false (원근 카메라) */
+  orthographic?: boolean;
+}
+
 /**
  * AscMosaic 라이브러리 메인 클래스
  */
 export class AscMosaic {
   private scene: THREE.Scene;
-  private camera: THREE.PerspectiveCamera;
+  private camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
   private renderer: THREE.WebGLRenderer;
   private cube: THREE.Mesh | null = null;
   private model: THREE.Object3D | null = null;
   private modelOptions: TexturedMeshOptions | null = null;
   private orbitControls: OrbitControls | null = null;
+  private lastOrbitOptions: OrbitControlsOptions | undefined = undefined;
   private tiltControlsEnabled: boolean = false;
   private tiltMouseMoveHandler: ((e: MouseEvent) => void) | null = null;
   private tiltMouseLeaveHandler: (() => void) | null = null;
@@ -29,29 +36,39 @@ export class AscMosaic {
   private asciiMosaicFilter: AsciiMosaicFilter | null = null;
   private animationFrameId: number | null = null;
   private isAnimating: boolean = false;
+  private useOrthographic: boolean = false;
+  /** 오소 카메라 뷰 높이의 절반 (월드 단위) */
+  private orthoSize: number = 5;
 
-  constructor(container: HTMLElement) {
+  constructor(container: HTMLElement, options?: AscMosaicOptions) {
     this.container = container;
+    this.useOrthographic = options?.orthographic ?? false;
 
     // Scene 생성
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0xffffff); // 흰색 배경
 
-    // Camera 생성
-    this.camera = new THREE.PerspectiveCamera(
-      75,
-      container.clientWidth / container.clientHeight,
-      0.1,
-      1000
-    );
+    // Camera 생성 (옵션에 따라 원근/오소)
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    const aspect = width / height;
+    if (this.useOrthographic) {
+      const halfH = this.orthoSize;
+      const halfW = halfH * aspect;
+      this.camera = new THREE.OrthographicCamera(
+        -halfW, halfW, halfH, -halfH, 0.1, 1000
+      );
+    } else {
+      this.camera = new THREE.PerspectiveCamera(75, aspect, 0.1, 1000);
+    }
     this.camera.position.z = 5;
 
     // Renderer 생성
-    this.renderer = new THREE.WebGLRenderer({ 
+    this.renderer = new THREE.WebGLRenderer({
       antialias: true,
       alpha: true, // 알파 채널 지원
     });
-    this.renderer.setSize(container.clientWidth, container.clientHeight);
+    this.renderer.setSize(width, height);
     // 색상이 정확하게 보이도록 tone mapping 설정
     this.renderer.toneMapping = THREE.LinearToneMapping;
     this.renderer.toneMappingExposure = 2.0;
@@ -59,13 +76,22 @@ export class AscMosaic {
 
     // 리사이즈 핸들러
     window.addEventListener('resize', () => {
-      const width = container.clientWidth;
-      const height = container.clientHeight;
-      this.camera.aspect = width / height;
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      if (this.camera instanceof THREE.PerspectiveCamera) {
+        this.camera.aspect = w / h;
+      } else {
+        const halfH = this.orthoSize;
+        const halfW = halfH * (w / h);
+        this.camera.left = -halfW;
+        this.camera.right = halfW;
+        this.camera.top = halfH;
+        this.camera.bottom = -halfH;
+      }
       this.camera.updateProjectionMatrix();
-      this.renderer.setSize(width, height);
+      this.renderer.setSize(w, h);
       if (this.asciiMosaicFilter) {
-        this.asciiMosaicFilter.setSize(width, height);
+        this.asciiMosaicFilter.setSize(w, h);
       }
     });
   }
@@ -223,11 +249,12 @@ export class AscMosaic {
       }
     }
 
-    // 옵션에 타겟 추가
+    // 옵션에 타겟 추가 및 마지막 옵션 저장 (setUseOrthographic에서 재사용)
     const orbitOptions: OrbitControlsOptions = {
       ...options,
       target: target || options?.target,
     };
+    this.lastOrbitOptions = orbitOptions;
 
     // 새 컨트롤 생성
     this.orbitControls = new OrbitControls(
@@ -647,8 +674,59 @@ export class AscMosaic {
   /**
    * Camera 가져오기
    */
-  getCamera(): THREE.PerspectiveCamera {
+  getCamera(): THREE.PerspectiveCamera | THREE.OrthographicCamera {
     return this.camera;
+  }
+
+  /** 오소 카메라 사용 여부 */
+  isOrthographic(): boolean {
+    return this.useOrthographic;
+  }
+
+  /**
+   * 오소 카메라 사용 설정 (런타임 전환 시 오비트 상태 유지)
+   */
+  setUseOrthographic(use: boolean): void {
+    if (this.useOrthographic === use) return;
+    const orbit = this.orbitControls;
+    let savedState: { target: THREE.Vector3; distance: number; theta: number; phi: number; orthoZoom?: number } | null = null;
+    if (orbit) {
+      savedState = orbit.getCameraState();
+      orbit.dispose();
+      this.orbitControls = null;
+    }
+    this.useOrthographic = use;
+    const width = this.container.clientWidth;
+    const height = this.container.clientHeight;
+    const aspect = width / height;
+    const pos = this.camera.position.clone();
+    const quat = this.camera.quaternion.clone();
+    if (use) {
+      const halfH = this.orthoSize;
+      const halfW = halfH * aspect;
+      this.camera = new THREE.OrthographicCamera(-halfW, halfW, halfH, -halfH, 0.1, 1000);
+    } else {
+      this.camera = new THREE.PerspectiveCamera(75, aspect, 0.1, 1000);
+    }
+    this.camera.position.copy(pos);
+    this.camera.quaternion.copy(quat);
+    this.camera.updateProjectionMatrix();
+    if (orbit && this.lastOrbitOptions != null && savedState != null) {
+      const state = savedState;
+      const opts = this.lastOrbitOptions;
+      this.orbitControls = new OrbitControls(
+        this.camera,
+        this.renderer.domElement,
+        { ...opts, target: state.target, orthoZoom: state.orthoZoom }
+      );
+      this.orbitControls.setCameraState(
+        state.target,
+        state.distance,
+        state.theta,
+        state.phi,
+        state.orthoZoom
+      );
+    }
   }
 
   /**
@@ -662,7 +740,17 @@ export class AscMosaic {
    * 캔버스 크기 설정
    */
   setCanvasSize(width: number, height: number): void {
-    this.camera.aspect = width / height;
+    const aspect = width / height;
+    if (this.camera instanceof THREE.PerspectiveCamera) {
+      this.camera.aspect = aspect;
+    } else {
+      const halfH = this.orthoSize;
+      const halfW = halfH * aspect;
+      this.camera.left = -halfW;
+      this.camera.right = halfW;
+      this.camera.top = halfH;
+      this.camera.bottom = -halfH;
+    }
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
     if (this.asciiMosaicFilter) {

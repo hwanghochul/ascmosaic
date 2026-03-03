@@ -552,6 +552,9 @@
         <span class="accordion-icon">▼</span>
       </div>
       <div class="accordion-content">
+        <div class="control-row checkboxes">
+          <label><input type="checkbox" id="orthographic-camera-checkbox"> 오소 카메라</label>
+        </div>
         <div class="control-group">
           <div class="control-row">
             <label for="camera-pos-x-slider">위치 X</label>
@@ -586,7 +589,7 @@
             <span class="slider-value" id="camera-distance-value">5</span>
           </div>
         </div>
-        <div class="control-row">
+        <div class="control-row" id="camera-fov-container">
           <label for="camera-fov-slider">FOV (시야각)</label>
           <input type="range" id="camera-fov-slider" min="10" max="120" value="75" step="1">
           <span class="slider-value" id="camera-fov-value">75</span>

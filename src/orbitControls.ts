@@ -24,14 +24,19 @@ export interface OrbitControlsOptions {
   initialTheta?: number;
   /** 타겟 위치 (기본값: 카메라가 보고 있는 지점 추정) */
   target?: THREE.Vector3;
+  /** 오소 카메라일 때 초기 줌 (복원용) */
+  orthoZoom?: number;
 }
 
 /**
  * 간단한 OrbitControls 구현
  * 카메라를 타겟 주위에서 회전하고 줌할 수 있게 합니다.
  */
+const ORTHO_ZOOM_MIN = 0.1;
+const ORTHO_ZOOM_MAX = 10;
+
 export class OrbitControls {
-  private camera: THREE.PerspectiveCamera;
+  private camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
   private domElement: HTMLElement;
   private target: THREE.Vector3;
 
@@ -60,7 +65,7 @@ export class OrbitControls {
   private onWheelHandler: (event: WheelEvent) => void;
 
   constructor(
-    camera: THREE.PerspectiveCamera,
+    camera: THREE.PerspectiveCamera | THREE.OrthographicCamera,
     domElement: HTMLElement,
     options: OrbitControlsOptions = {}
   ) {
@@ -97,6 +102,12 @@ export class OrbitControls {
     this.maxPolarAngle = options.maxPolarAngle ?? (5 * Math.PI) / 6; // 150도
     this.autoRotate = options.autoRotate ?? false;
     this.autoRotateSpeed = options.autoRotateSpeed ?? 1.0;
+
+    // 오소 카메라일 때 초기 줌 복원
+    if (this.camera instanceof THREE.OrthographicCamera && options.orthoZoom != null) {
+      this.camera.zoom = Math.max(ORTHO_ZOOM_MIN, Math.min(ORTHO_ZOOM_MAX, options.orthoZoom));
+      this.camera.updateProjectionMatrix();
+    }
 
     // 초기 카메라 위치에서 각도 계산
     // 카메라 위치를 타겟 기준 상대 좌표로 변환
@@ -236,14 +247,20 @@ export class OrbitControls {
   private onWheel(event: WheelEvent): void {
     event.preventDefault();
 
-    const delta = event.deltaY > 0 ? 1 : -1;
-    this.distance += delta * this.zoomSpeed;
-    this.distance = Math.max(
-      this.minDistance,
-      Math.min(this.maxDistance, this.distance)
-    );
-
-    this.updateCamera();
+    if (this.camera instanceof THREE.OrthographicCamera) {
+      const delta = event.deltaY > 0 ? -1 : 1;
+      this.camera.zoom *= 1 + delta * this.zoomSpeed;
+      this.camera.zoom = Math.max(ORTHO_ZOOM_MIN, Math.min(ORTHO_ZOOM_MAX, this.camera.zoom));
+      this.camera.updateProjectionMatrix();
+    } else {
+      const delta = event.deltaY > 0 ? 1 : -1;
+      this.distance += delta * this.zoomSpeed;
+      this.distance = Math.max(
+        this.minDistance,
+        Math.min(this.maxDistance, this.distance)
+      );
+      this.updateCamera();
+    }
   }
 
   /**
@@ -342,9 +359,15 @@ export class OrbitControls {
   }
 
   /**
-   * 카메라 상태 설정 (타겟, 거리, 각도)
+   * 카메라 상태 설정 (타겟, 거리, 각도, 오소일 때 줌)
    */
-  setCameraState(target: THREE.Vector3, distance: number, theta: number, phi: number): void {
+  setCameraState(
+    target: THREE.Vector3,
+    distance: number,
+    theta: number,
+    phi: number,
+    orthoZoom?: number
+  ): void {
     this.target.copy(target);
     this.distance = Math.max(
       this.minDistance,
@@ -356,18 +379,38 @@ export class OrbitControls {
       Math.min(this.maxPolarAngle, phi)
     );
     this.updateCamera();
+    if (this.camera instanceof THREE.OrthographicCamera && orthoZoom != null) {
+      this.camera.zoom = Math.max(ORTHO_ZOOM_MIN, Math.min(ORTHO_ZOOM_MAX, orthoZoom));
+      this.camera.updateProjectionMatrix();
+    }
   }
 
   /**
-   * 카메라 상태 가져오기 (타겟, 거리, 각도)
+   * 카메라 상태 가져오기 (타겟, 거리, 각도, 오소일 때 orthoZoom)
    */
-  getCameraState(): { target: THREE.Vector3; distance: number; theta: number; phi: number } {
-    return {
+  getCameraState(): {
+    target: THREE.Vector3;
+    distance: number;
+    theta: number;
+    phi: number;
+    orthoZoom?: number;
+  } {
+    const state: {
+      target: THREE.Vector3;
+      distance: number;
+      theta: number;
+      phi: number;
+      orthoZoom?: number;
+    } = {
       target: this.target.clone(),
       distance: this.distance,
       theta: this.theta,
       phi: this.phi,
     };
+    if (this.camera instanceof THREE.OrthographicCamera) {
+      state.orthoZoom = this.camera.zoom;
+    }
+    return state;
   }
 
   /**
