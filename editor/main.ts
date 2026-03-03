@@ -132,6 +132,8 @@ function loadStateFromURL(): boolean {
       }
     }
     if (state.adjustCellOrder !== undefined) currentAdjustCellOrder = state.adjustCellOrder;
+    if (state.minBrightness !== undefined) currentMinBrightness = state.minBrightness;
+    if (state.maxBrightness !== undefined) currentMaxBrightness = state.maxBrightness;
     if (state.shape !== undefined) currentShape = state.shape;
     if (state.radius !== undefined) currentRadius = state.radius;
     if (state.cubeSize !== undefined) currentCubeSize = state.cubeSize;
@@ -183,6 +185,9 @@ function saveStateToURL(): void {
     avoid: currentAvoid,
     avoidRadius: currentAvoidRadius,
     avoidStrength: currentAvoidStrength,
+    adjustCellOrder: currentAdjustCellOrder,
+    minBrightness: currentMinBrightness,
+    maxBrightness: currentMaxBrightness,
     textureType: currentTextureType,
     shape: currentShape,
     radius: currentRadius,
@@ -499,6 +504,7 @@ minBrightnessSlider.addEventListener('input', (e) => {
   if (mosaic.isAsciiMosaicFilterEnabled()) {
     mosaic.setMinBrightness(brightness);
   }
+  saveStateToURL();
   updateHTMLCodeIfRealtime();
 });
 
@@ -510,6 +516,7 @@ maxBrightnessSlider.addEventListener('input', (e) => {
   if (mosaic.isAsciiMosaicFilterEnabled()) {
     mosaic.setMaxBrightness(brightness);
   }
+  saveStateToURL();
   updateHTMLCodeIfRealtime();
 });
 
@@ -1344,6 +1351,8 @@ loadResourceList().then(async () => {
       mosaic.setAvoid(currentAvoid);
       mosaic.setAvoidRadius(currentAvoidRadius);
       mosaic.setAvoidStrength(currentAvoidStrength);
+      mosaic.setMinBrightness(currentMinBrightness);
+      mosaic.setMaxBrightness(currentMaxBrightness);
       const filter = mosaic.getAsciiMosaicFilter();
       if (filter) {
         (filter as any).setAdjustCellOrder(currentAdjustCellOrder);
